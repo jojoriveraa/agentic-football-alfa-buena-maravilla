@@ -7,10 +7,17 @@ match standing still. These checks catch that class of mistake and let the
 rule-based fallback decide instead.
 """
 
-from state import holder_is_me, pitch_bounds, pitch_scale
+from state import get_possession_info, holder_is_me, pitch_bounds, pitch_scale
 
 POSSESSION_COMMANDS = {"PASS", "SHOOT", "GK_DISTRIBUTE"}
 """Commands that only do something when this player holds the ball."""
+
+OUT_OF_POSSESSION_COMMANDS = {"PRESS_BALL", "INTERCEPT"}
+"""Commands that chase the ball, pointless while our own team holds it.
+
+In the second match the defender sent PRESS_BALL 26 times while a teammate
+had the ball, running at its own player and leaving the back line empty.
+"""
 
 
 def needs_fallback(commands: list[dict], game_state: dict, team_id: int, my_player_id: int):
@@ -18,10 +25,11 @@ def needs_fallback(commands: list[dict], game_state: dict, team_id: int, my_play
     ball = game_state.get("ball", {})
     players = game_state.get("players", [])
     for cmd in commands:
-        if cmd.get("commandType") in POSSESSION_COMMANDS and not holder_is_me(
-            ball, players, team_id, my_player_id
-        ):
-            return f"{cmd['commandType']} without the ball"
+        ctype = cmd.get("commandType")
+        if ctype in POSSESSION_COMMANDS and not holder_is_me(ball, players, team_id, my_player_id):
+            return f"{ctype} without the ball"
+        if ctype in OUT_OF_POSSESSION_COMMANDS and get_possession_info(ball, players, team_id)[2]:
+            return f"{ctype} while our team has the ball"
     return None
 
 

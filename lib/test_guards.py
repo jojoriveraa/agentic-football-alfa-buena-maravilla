@@ -34,6 +34,17 @@ def test_holder_and_off_ball_commands_pass():
     print("=== GUARD: holder may shoot, MOVE_TO always allowed ===")
 
 
+def test_chasing_our_own_ball_is_flagged():
+    """Home player 3 holds the ball: home pressing is pointless, away pressing is fine."""
+    press = [{"commandType": "PRESS_BALL", "playerId": 1, "parameters": {"intensity": 0.7}}]
+    assert needs_fallback(press, GAME_STATE, HOME, 1) == "PRESS_BALL while our team has the ball"
+    assert needs_fallback(press, GAME_STATE, AWAY, 1) is None
+    loose = copy.deepcopy(GAME_STATE)
+    loose["ball"]["isFree"] = True
+    assert needs_fallback(press, loose, HOME, 1) is None
+    print("=== GUARD: no pressing or intercepting our own ball ===")
+
+
 def test_reference_units_on_small_pitch_are_rescaled():
     """x=35 on a ±6.6 pitch means the model reasoned in reference units."""
     gs = scaled_state(0.12)
