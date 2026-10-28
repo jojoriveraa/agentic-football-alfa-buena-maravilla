@@ -8,7 +8,15 @@ rule-based fallback decide instead.
 """
 
 from state import get_possession_info, holder_is_me, pitch_bounds, pitch_scale
-from tactics import in_shooting_range, keeper_leaves_zone, pass_options, pressure, runs_backward
+from tactics import (
+    first_defender,
+    goes_for_ball,
+    in_shooting_range,
+    keeper_leaves_zone,
+    pass_options,
+    pressure,
+    runs_backward,
+)
 
 POSSESSION_COMMANDS = {"PASS", "SHOOT", "GK_DISTRIBUTE"}
 """Commands that only do something when this player holds the ball."""
@@ -48,6 +56,10 @@ def tactical_override(commands: list[dict], game_state: dict, team_id: int, my_p
     ball = game_state.get("ball", {})
     players = game_state.get("players", [])
     if not holder_is_me(ball, players, team_id, my_player_id):
+        if position_label != "GK" and first_defender(game_state, team_id) == my_player_id:
+            if not goes_for_ball(commands, game_state):
+                return "first defender goes for the ball"
+            return None
         if position_label == "GK":
             if any(keeper_leaves_zone(c, game_state, team_id) for c in commands):
                 return "goalkeeper stays home"

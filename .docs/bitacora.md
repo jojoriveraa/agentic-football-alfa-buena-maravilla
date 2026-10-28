@@ -10,8 +10,9 @@ Cómo llenarla: ver [README de .docs](README.md).
 | [v0](#v0--código-original-de-aws) | 2026-10-28 | Código de ejemplo de AWS, sin cambios | 2 | 0-0-2 | 3 / 7 |
 | [v1](#v1--escala-del-campo-filtros-y-entrenador) | 2026-10-28 | Escala real del campo, filtros de comandos imposibles, instrucciones del entrenador | 1 | 0-0-1 | 0 / 1 |
 | [v2](#v2--juego-de-posesión-triangulaciones-autopase-y-despeje-largo) | 2026-10-28 | Triangulaciones, sin pases atrás en zona propia, autopase con presión, despeje largo del portero | 1 | 0-0-1 | 0 / 1 |
-| [v3](#v3--tiros-de-media-distancia-portero-en-su-arco-y-sin-retroceder-en-ataque) | 2026-10-28 | Tiros de media distancia, portero atado a su arco, nada de retroceder en ataque | 0 | – | – |
-| [v4](#v4--saber-de-verdad-quién-tiene-el-balón) | 2026-10-28 | Saber de verdad quién tiene el balón (v3 + corrección de posesión) | 0 | – | – |
+| [v3](#v3--tiros-de-media-distancia-portero-en-su-arco-y-sin-retroceder-en-ataque) | 2026-10-28 | Tiros de media distancia, portero atado a su arco, nada de retroceder en ataque | 1 | 0-0-1 | 0 / 1 |
+| [v4](#v4--saber-de-verdad-quién-tiene-el-balón) | 2026-10-28 | Saber de verdad quién tiene el balón (v3 + corrección de posesión) | 1 | 0-0-1 | 0 / 1 |
+| [v5](#v5--primer-defensor-alguien-siempre-va-por-el-balón) | 2026-10-28 | Primer defensor: el más cercano siempre va por el balón | 0 | – | – |
 
 G-E-P = ganados, empatados, perdidos.
 
@@ -23,6 +24,8 @@ G-E-P = ganados, empatados, perdidos.
 | 2 | 2026-10-28 | v0 | Total Attack United (muy ofensivo) | 2-4 | 34% | 2 (2) | [txt](partidos/2026-10-28-p2-total-attack-united.txt) · [json](partidos/2026-10-28-p2-total-attack-united.json) |
 | 3 | 2026-10-28 | v1 | Fort Knox Athletic (muy defensivo) | 0-1 | 45% | 1 (0) | [txt](partidos/2026-10-28-p3-fort-knox-athletic.txt) · [json](partidos/2026-10-28-p3-fort-knox-athletic.json) |
 | 4 | 2026-10-28 | v2 | The Benchmark FC (equilibrado) | 0-1 (gol a los 182 s) | – | – | [txt](partidos/2026-10-28-p4-benchmark-fc.txt) · [json](partidos/2026-10-28-p4-benchmark-fc.json) |
+| 5 | 2026-10-28 | v3 | Guerreros de Dios (otro equipo del evento) | 0-1 (gol a los 117 s) | 11% real | – | [txt](partidos/2026-10-28-p5-guerreros-de-dios.txt) · [json](partidos/2026-10-28-p5-guerreros-de-dios.json) |
+| 6 | 2026-10-28 | v4 | The Benchmark FC (equilibrado) | 0-1 (gol a los 113 s) | 28% real | – | [txt](partidos/2026-10-28-p6-benchmark-fc.txt) · [json](partidos/2026-10-28-p6-benchmark-fc.json) |
 
 \* Según el Match Report del Player Portal. Ver la [nota sobre el reporte](#nota-el-match-report-invierte-las-columnas-de-comandos).
 
@@ -220,6 +223,48 @@ Efectos durante esos momentos:
 | Razón `PRESS_BALL while our team has the ball` | 9-22 por partido (DEF) | Mucho menor: ahora sí se presiona al rival |
 | Razones `under pressure...` | 23 | Menos, porque desaparecen las posesiones falsas |
 | `conBalon` por jugador | inflado | Más bajo y real |
+
+### Resultados
+
+Partido 6 contra The Benchmark FC: derrota 0-1, gol en contra a los 113 s.
+
+- **La corrección funciona:** solo 1 de 61 muestras con la posesión mal atribuida, contra 26 de 90 en P4.
+- **Posesión real:** nuestra 28%, rival 36%, **balón suelto 36%**.
+- Tuvimos poco el balón: `conBalon` 0-6 por jugador.
+
+El partido 5 (Guerreros de Dios) se jugó con **v3**: las sesiones empezaron antes de que terminara el despliegue de v4. Ver v5.
+
+---
+
+## v5 — Primer defensor: alguien siempre va por el balón
+
+**Desplegado en AgentCore:** versión 7 de los runtimes, 2026-10-28.
+
+### Hallazgo
+
+Observación del entrenador: *"cuando el equipo contrario está trabado con un error, nuestro equipo no busca la posesión ni ataca con al menos un jugador"*.
+
+- **P5 vs Guerreros de Dios** (con v3, sin la corrección de posesión):
+  - el rival estaba trabado: sus 5 jugadores quietos en su mitad todo el partido, con 7 `RESET` y 1.1 s de latencia según el reporte;
+  - tuvo el balón el 62% del tiempo;
+  - nuestros agentes creían tenerlo en 38 de 61 muestras, así que nadie fue a quitárselo;
+  - el filtro corrigió 66 veces "retroceder en ataque" y bloqueó presiones;
+  - los delanteros se quedaron en +1.3 y +1.6 de promedio, lejos del balón.
+- **P6 vs Benchmark** (con v4): ya sin el error de posesión, el balón estuvo suelto el 36% del tiempo y ninguna regla asignaba a alguien para ir por él.
+
+### Cambio
+
+- `tactics.first_defender()`: con el balón suelto o en poder del rival, nuestro jugador de campo más cercano al balón es el "primer defensor".
+- Si su comando no va por el balón, se cambia: `MOVE_TO` al balón con sprint si está suelto, `PRESS_BALL` con intensidad 0.8 si lo tiene un rival. Razón en el reporte: `first defender goes for the ball`.
+- El modelo lo ve en la pista `YOU ARE THE CLOSEST TO THE BALL: go win it.` El resto del equipo no cambia.
+
+### Qué esperamos ver
+
+| Métrica | Antes | Esperado |
+|---|---|---|
+| Balón suelto | 36% (P6) | Menos |
+| Posesión real nuestra | 11-28% | Más |
+| Contra un rival trabado | nadie va por el balón | El más cercano lo presiona hasta quitárselo |
 
 ### Resultados
 

@@ -1,0 +1,117 @@
+{
+  "gk": {
+    "session": "a4a83f9d-e9fb-4a35-8df1-b545cec22a16-team0-pos0",
+    "inicio_utc": "19:00:36",
+    "llamadas": 67,
+    "modelo_ok": 65,
+    "filtro_corrigio": 38,
+    "respaldo_por_parseo": 2,
+    "latencia_p50_s": 0.46,
+    "latencia_max_s": 0.76,
+    "comandos_del_modelo": {
+      "GK_DISTRIBUTE": 31,
+      "MOVE_TO": 25,
+      "INTERCEPT": 11
+    },
+    "con_balon": 9,
+    "pide_pase_tiro_saque_sin_balon": 22,
+    "persigue_balon_propio": 0,
+    "mensajes_entrenador": [],
+    "razones_del_filtro": {
+      "GK_DISTRIBUTE without the ball": 22,
+      "goalkeeper stays home": 16
+    }
+  },
+  "def": {
+    "session": "a4a83f9d-e9fb-4a35-8df1-b545cec22a16-team0-pos1",
+    "inicio_utc": "19:00:36",
+    "llamadas": 67,
+    "modelo_ok": 67,
+    "filtro_corrigio": 8,
+    "latencia_p50_s": 0.57,
+    "latencia_max_s": 0.84,
+    "comandos_del_modelo": {
+      "MOVE_TO": 23,
+      "PRESS_BALL": 19,
+      "PASS": 14,
+      "FOLLOW_PLAYER": 4,
+      "INTERCEPT": 4,
+      "MARK": 2,
+      "SET_STANCE": 1
+    },
+    "con_balon": 14,
+    "pide_pase_tiro_saque_sin_balon": 0,
+    "persigue_balon_propio": 8,
+    "mensajes_entrenador": [],
+    "razones_del_filtro": {
+      "PRESS_BALL while our team has the ball": 8
+    }
+  },
+  "mid": {
+    "session": "a4a83f9d-e9fb-4a35-8df1-b545cec22a16-team0-pos2",
+    "inicio_utc": "19:00:36",
+    "llamadas": 65,
+    "modelo_ok": 65,
+    "filtro_corrigio": 19,
+    "latencia_p50_s": 0.67,
+    "latencia_max_s": 1.66,
+    "comandos_del_modelo": {
+      "MOVE_TO": 48,
+      "PASS": 7,
+      "INTERCEPT": 5,
+      "PRESS_BALL": 5
+    },
+    "con_balon": 7,
+    "pide_pase_tiro_saque_sin_balon": 0,
+    "persigue_balon_propio": 0,
+    "mensajes_entrenador": [],
+    "razones_del_filtro": {
+      "backward run while attacking": 19
+    }
+  },
+  "fwd1": {
+    "session": "a4a83f9d-e9fb-4a35-8df1-b545cec22a16-team0-pos3",
+    "inicio_utc": "19:00:36",
+    "llamadas": 66,
+    "modelo_ok": 66,
+    "filtro_corrigio": 22,
+    "latencia_p50_s": 0.5,
+    "latencia_max_s": 0.73,
+    "comandos_del_modelo": {
+      "MOVE_TO": 53,
+      "PASS": 8,
+      "PRESS_BALL": 3,
+      "SHOOT": 2
+    },
+    "con_balon": 9,
+    "pide_pase_tiro_saque_sin_balon": 1,
+    "persigue_balon_propio": 0,
+    "mensajes_entrenador": [],
+    "razones_del_filtro": {
+      "backward run while attacking": 21,
+      "under pressure without an open pass, carry the ball": 1
+    }
+  },
+  "fwd2": {
+    "session": "a4a83f9d-e9fb-4a35-8df1-b545cec22a16-team0-pos4",
+    "inicio_utc": "19:00:36",
+    "llamadas": 66,
+    "modelo_ok": 66,
+    "filtro_corrigio": 26,
+    "latencia_p50_s": 0.64,
+    "latencia_max_s": 0.98,
+    "comandos_del_modelo": {
+      "MOVE_TO": 46,
+      "PRESS_BALL": 10,
+      "PASS": 5,
+      "SHOOT": 5
+    },
+    "con_balon": 11,
+    "pide_pase_tiro_saque_sin_balon": 1,
+    "persigue_balon_propio": 0,
+    "mensajes_entrenador": [],
+    "razones_del_filtro": {
+      "backward run while attacking": 26
+    }
+  }
+}

@@ -1,0 +1,17 @@
+Partido: sesion f888192c-f982-47ae-b490-ec5fa339e73e-team0-pos0  inicio 19:05:58 UTC
+
+pos   llam   ok filtro ajuste resp err   p50 conBalon sinBalon  propio  comandos del modelo
+GK      68   68     26      2    0   0  0.49        4       11       0  {'MOVE_TO': 43, 'GK_DISTRIBUTE': 15, 'INTERCEPT': 10}
+DEF     65   65      2      0    0   0  0.62        0        0       2  {'PRESS_BALL': 34, 'MOVE_TO': 17, 'INTERCEPT': 10, 'MARK': 2, 'SET_STANCE': 1, 'SLIDE_TACKLE': 1}
+MID     66   66      6      0    0   0  0.61        4        0       0  {'MOVE_TO': 27, 'PRESS_BALL': 24, 'INTERCEPT': 10, 'PASS': 3, 'MARK': 2}
+FWD1    66   66      6      1    0   0  0.49        6        1       0  {'MOVE_TO': 53, 'PRESS_BALL': 6, 'PASS': 4, 'SHOOT': 2, 'FOLLOW_PLAYER': 1}
+FWD2    66   66      6      0    0   0  0.62        3        1       0  {'PRESS_BALL': 32, 'MOVE_TO': 30, 'SHOOT': 4}
+  filtro GK    {'goalkeeper stays home': 15, 'GK_DISTRIBUTE without the ball': 11}
+  filtro DEF   {'PRESS_BALL while our team has the ball': 2}
+  filtro MID   {'backward run while attacking': 5, 'under pressure, carry the ball': 1}
+  filtro FWD1  {'backward run while attacking': 3, 'under pressure, carry the ball': 2, 'under pressure without an open pass, carry the ball': 1}
+  filtro FWD2  {'under pressure, carry the ball': 3, 'backward run while attacking': 2, 'SHOOT without the ball': 1}
+
+Campo observado: x [-7.0, 6.7]  y [-3.5, 3.6]
+Marcador (local-visitante): 0s 0-0 -> 113s 0-1
+Mensajes del entrenador vistos: ninguno

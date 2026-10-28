@@ -11,7 +11,7 @@ from state import summarize_state
 from fallback import FallbackConfig, build_last_resort
 from guards import fit_to_pitch, needs_fallback, tactical_override
 from state import holder_is_me
-from tactics import keeper_move, on_ball_decision, support_move, team_play_lines
+from tactics import chase_move, first_defender, keeper_move, on_ball_decision, support_move, team_play_lines
 
 
 def create_agent(
@@ -108,6 +108,8 @@ def create_invoke_handler(
                 return [on_ball_decision(game_state, team_id, pid, position_label)]
             if position_label == "GK":
                 return [keeper_move(game_state, team_id, pid)]
+            if first_defender(game_state, team_id) == pid:
+                return [chase_move(game_state, team_id, pid)]
             support = support_move(game_state, team_id, pid, position_label)
             if support:
                 return [support]

@@ -48,6 +48,9 @@ KEEPER_CHASE_RADIUS = 14.0
 BACKWARD_MARGIN = 0.1
 """Retreat, as a fraction of the half-length, that counts as running backward."""
 CHASE_COMMANDS = {"PRESS_BALL", "INTERCEPT", "MARK", "FOLLOW_PLAYER", "SLIDE_TACKLE"}
+WIN_BALL_COMMANDS = {"PRESS_BALL", "INTERCEPT", "SLIDE_TACKLE"}
+BALL_REACH = 8.0
+"""A MOVE_TO ending this close to the ball counts as going for it."""
 DRIBBLE_ANGLES = (0.0, 35.0, -35.0, 60.0, -60.0)
 
 TEAM_PLAY_RULES = """## Team Play (hints are computed for the real pitch; these rules win over your role rules)
@@ -57,7 +60,8 @@ TEAM_PLAY_RULES = """## Team Play (hints are computed for the real pitch; these 
   3. Otherwise PASS to bestPass with the pass type shown.
   4. Never pass to an option marked FORBIDDEN (back pass near your own goal).
 - When a teammate has the ball, the state shows your supportSpot: MOVE_TO it to form a passing triangle with the ball carrier.
-- When your team has the ball, never run back toward your own goal (except the defender)."""
+- When your team has the ball, never run back toward your own goal (except the defender).
+- When the state says YOU ARE THE CLOSEST TO THE BALL, go win it: PRESS_BALL if an opponent has it, MOVE_TO the ball with sprint=true if it is loose."""
 
 
 def attack_dir(team_id: int) -> int:
@@ -282,6 +286,51 @@ def on_ball_decision(game_state: dict, team_id: int, my_player_id: int, position
                 {"target_player_id": choice["id"], "type": pass_type(choice, scale)})
 
 
+def first_defender(game_state: dict, team_id: int):
+    """Our outfield player closest to the ball when we do not hold it, else None.
+
+    Seen in the matches: with the ball loose (up to 36% of the time) or an
+    opponent stuck holding it in its own half, nobody was assigned to go for
+    it, so nobody did.
+    """
+    ball = game_state.get("ball", {})
+    players = game_state.get("players", [])
+    bpos = ball.get("position")
+    if not isinstance(bpos, dict) or get_possession_info(ball, players, team_id)[2]:
+        return None
+    outfield = [p for p in players if _is_my_team(p, team_id) and _player_idx(p) != 0]
+    if not outfield:
+        return None
+    return _player_idx(min(outfield, key=lambda p: dist(p.get("position", {}), bpos)))
+
+
+def goes_for_ball(commands: list[dict], game_state: dict) -> bool:
+    scale = pitch_scale(game_state)
+    bpos = game_state.get("ball", {}).get("position", {})
+    for cmd in commands:
+        if cmd.get("commandType") in WIN_BALL_COMMANDS:
+            return True
+        p = cmd.get("parameters") or {}
+        if cmd.get("commandType") == "MOVE_TO" and isinstance(p.get("target_x"), (int, float)):
+            if math.dist((p["target_x"], p.get("target_y", 0)), (bpos.get("x", 0), bpos.get("y", 0))) < BALL_REACH * scale:
+                return True
+    return False
+
+
+def chase_move(game_state: dict, team_id: int, my_player_id: int) -> dict:
+    """Go win the ball: run onto a loose ball, press an opponent holding it."""
+    ball = game_state.get("ball", {})
+    bpos = ball.get("position", {})
+    if _resolve_free(ball, game_state.get("players", []), team_id):
+        x, y = _clamp(bpos.get("x", 0), bpos.get("y", 0), pitch_scale(game_state))
+        return _cmd("MOVE_TO", my_player_id, team_id, {"target_x": x, "target_y": y, "sprint": True})
+    return _cmd("PRESS_BALL", my_player_id, team_id, {"intensity": 0.8}, duration=2)
+
+
+def _resolve_free(ball: dict, players: list, team_id: int) -> bool:
+    return get_possession_info(ball, players, team_id)[1] in ("free", "unknown")
+
+
 def ball_near_our_goal(game_state: dict, team_id: int) -> bool:
     scale = pitch_scale(game_state)
     my_goal_x, _ = get_goal_positions(team_id, scale)
@@ -363,4 +412,6 @@ def team_play_lines(game_state: dict, team_id: int, my_player_id: int, position_
     spot = support_spot(game_state, team_id, my_player_id, position_label)
     if spot:
         return [f"TEAMMATE HAS THE BALL: your supportSpot=({spot[0]:.1f},{spot[1]:.1f}) for the passing triangle"]
+    if position_label != "GK" and first_defender(game_state, team_id) == my_player_id:
+        return ["YOU ARE THE CLOSEST TO THE BALL: go win it."]
     return []
