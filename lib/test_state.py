@@ -157,7 +157,7 @@ def test_reference_pitch_is_unchanged():
     out = summarize_state(GAME_STATE, HOME, 3, "FWD1")
     assert "Pitch: x from -55.0 to 55.0, y from -35.0 to 35.0" in out, out
     assert "Your goal at x=-55.0 | Opponent goal at x=55.0" in out
-    assert "shootRange=25.0" in out
+    assert "shootRange=35.0" in out
     print("=== PITCH: reference pitch detected and rendered as before ===")
 
 
@@ -169,8 +169,8 @@ def test_small_pitch_is_detected():
     out = summarize_state(gs, AWAY, 3, "FWD1")
     assert "Pitch: x from -6.6 to 6.6, y from -4.2 to 4.2" in out, out
     assert "Your goal at x=6.6 | Opponent goal at x=-6.6" in out
-    assert "shootRange=3.0" in out
-    print("=== PITCH: small pitch detected, goals at ±6.6, shootRange 3.0 ===")
+    assert "shootRange=4.2" in out
+    print("=== PITCH: small pitch detected, goals at ±6.6, shootRange 4.2 ===")
 
 
 def test_missing_keepers_assume_reference():

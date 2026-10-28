@@ -8,7 +8,7 @@ rule-based fallback decide instead.
 """
 
 from state import get_possession_info, holder_is_me, pitch_bounds, pitch_scale
-from tactics import in_shooting_range, pass_options, pressure
+from tactics import in_shooting_range, keeper_leaves_zone, pass_options, pressure, runs_backward
 
 POSSESSION_COMMANDS = {"PASS", "SHOOT", "GK_DISTRIBUTE"}
 """Commands that only do something when this player holds the ball."""
@@ -48,6 +48,12 @@ def tactical_override(commands: list[dict], game_state: dict, team_id: int, my_p
     ball = game_state.get("ball", {})
     players = game_state.get("players", [])
     if not holder_is_me(ball, players, team_id, my_player_id):
+        if position_label == "GK":
+            if any(keeper_leaves_zone(c, game_state, team_id) for c in commands):
+                return "goalkeeper stays home"
+        elif position_label in ("MID", "FWD1", "FWD2") and get_possession_info(ball, players, team_id)[2]:
+            if any(runs_backward(c, game_state, team_id, my_player_id) for c in commands):
+                return "backward run while attacking"
         return None
     if position_label == "GK":
         cmd = commands[0] if commands else {}
@@ -68,6 +74,8 @@ def tactical_override(commands: list[dict], game_state: dict, team_id: int, my_p
                 return "back pass in our defensive third"
             if under and not (option and option["open"] and not option["blocked"]):
                 return "under pressure without an open pass, carry the ball"
+        elif runs_backward(cmd, game_state, team_id, my_player_id):
+            return "carrying the ball backward"
         elif under and not (ctype == "SHOOT" and in_range):
             return "under pressure, carry the ball"
     return None

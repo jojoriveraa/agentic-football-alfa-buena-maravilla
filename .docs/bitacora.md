@@ -9,7 +9,8 @@ Cómo llenarla: ver [README de .docs](README.md).
 |---|---|---|---|---|---|
 | [v0](#v0--código-original-de-aws) | 2026-10-28 | Código de ejemplo de AWS, sin cambios | 2 | 0-0-2 | 3 / 7 |
 | [v1](#v1--escala-del-campo-filtros-y-entrenador) | 2026-10-28 | Escala real del campo, filtros de comandos imposibles, instrucciones del entrenador | 1 | 0-0-1 | 0 / 1 |
-| [v2](#v2--juego-de-posesión-triangulaciones-autopase-y-despeje-largo) | 2026-10-28 | Triangulaciones, sin pases atrás en zona propia, autopase con presión, despeje largo del portero | 0 | – | – |
+| [v2](#v2--juego-de-posesión-triangulaciones-autopase-y-despeje-largo) | 2026-10-28 | Triangulaciones, sin pases atrás en zona propia, autopase con presión, despeje largo del portero | 1 | 0-0-1 | 0 / 1 |
+| [v3](#v3--tiros-de-media-distancia-portero-en-su-arco-y-sin-retroceder-en-ataque) | 2026-10-28 | Tiros de media distancia, portero atado a su arco, nada de retroceder en ataque | 0 | – | – |
 
 G-E-P = ganados, empatados, perdidos.
 
@@ -20,6 +21,7 @@ G-E-P = ganados, empatados, perdidos.
 | 1 | 2026-10-28 | v0 | The Benchmark FC (equilibrado) | 1-3 | 41% | 4 (1) | [txt](partidos/2026-10-28-p1-benchmark-fc.txt) · [json](partidos/2026-10-28-p1-benchmark-fc.json) |
 | 2 | 2026-10-28 | v0 | Total Attack United (muy ofensivo) | 2-4 | 34% | 2 (2) | [txt](partidos/2026-10-28-p2-total-attack-united.txt) · [json](partidos/2026-10-28-p2-total-attack-united.json) |
 | 3 | 2026-10-28 | v1 | Fort Knox Athletic (muy defensivo) | 0-1 | 45% | 1 (0) | [txt](partidos/2026-10-28-p3-fort-knox-athletic.txt) · [json](partidos/2026-10-28-p3-fort-knox-athletic.json) |
+| 4 | 2026-10-28 | v2 | _por confirmar_ | 0-1 (gol a los 182 s) | – | – | [txt](partidos/2026-10-28-p4-rival-por-confirmar.txt) · [json](partidos/2026-10-28-p4-rival-por-confirmar.json) |
 
 \* Según el Match Report del Player Portal. Ver la [nota sobre el reporte](#nota-el-match-report-invierte-las-columnas-de-comandos).
 
@@ -134,11 +136,53 @@ Prueba local con el modelo real: MID con presión eligió un pase en profundidad
 
 ### Resultados
 
-_Pendiente: partidos de calibración._
+Un partido, el 4: derrota 0-1, con el gol en contra recién a los 182 s. Aguantamos 3 minutos sin recibir.
+
+| Métrica | v1 (partido 3) | v2 (partido 4) |
+|---|---|---|
+| Correcciones por presión (conducir) | – | 23: DEF 5, MID 6, FWD1 4, FWD2 8 |
+| Pases atrás en nuestro tercio corregidos | – | 1, porque el modelo ya respeta `FORBIDDEN` |
+| DEF presiona el balón propio | 22 | 9 |
+| GK pide sacar sin balón | 19 | 33 |
+| Tiros pedidos FWD1 / FWD2 | 7 / 11 | 2 / 9; 8 de los de FWD2 se cambiaron por conducciones |
 
 ### Qué mejorar → v3
 
-_Llenar después de los partidos de v2._
+Lo que vio el entrenador en el partido 4:
+
+- **"El delantero no tira; que considere tiros de media distancia."** Causa: el filtro de presión solo dejaba tirar dentro de `shootRange` (3.0 unidades) y cambió 8 tiros de FWD2 por conducciones.
+- **"Mis jugadores a veces van hacia atrás en vez de adelante cuando están en ataque."** Causa: en v2 el punto de triángulo del MID estaba detrás del que lleva el balón, y nada impedía retroceder.
+- **"El portero a veces deja su posición."** Causa: nada limitaba sus `MOVE_TO` (moverse) ni `INTERCEPT` (interceptar); el modelo pidió 43 movimientos y 7 intercepciones.
+
+---
+
+## v3 — Tiros de media distancia, portero en su arco y sin retroceder en ataque
+
+**Desplegado en AgentCore:** versión 5 de los runtimes, 2026-10-28.
+
+### Cambios
+
+- **Tiros de media distancia:** `SHOOT_RANGE` pasa de 25 a 35 unidades de referencia (4.2 en el campo real, un tercio del largo). Dentro del rango se tira aunque haya presión; la decisión del código tira con potencia 1.0.
+- **Portero atado al arco:** si el balón no está cerca de nuestro arco (14 unidades de referencia, 1.7 reales), el código cambia por su posición de guardia (entre el balón y el centro del arco) cualquier intento de presionar, interceptar, marcar, seguir o barrerse, y cualquier `MOVE_TO` a más de 9 unidades de referencia (1.1 reales) de su línea. Razón en el reporte: `goalkeeper stays home`.
+- **Sin retroceder en ataque:** con el balón en nuestro equipo, MID, FWD1 y FWD2 no pueden correr hacia su propio arco; van a su `supportSpot` (`backward run while attacking`). El que lleva el balón no conduce hacia atrás (`carrying the ball backward`). El DEF sí puede, porque es la seguridad.
+- **MID** se ubica a la par del que lleva el balón y abierto, ya no detrás.
+
+### Qué esperamos ver
+
+| Métrica | v2 | Esperado en v3 |
+|---|---|---|
+| Tiros de FWD1 + FWD2 | 11 pedidos | Más, y menos correcciones `under pressure` sobre tiros |
+| Razón `goalkeeper stays home` | – | Aparece; el GK ya no sale lejos sin motivo |
+| Razón `backward run while attacking` | – | Aparece al principio; idealmente baja a medida que el modelo usa `supportSpot` |
+| Goles a favor | 0 | Más de 0 |
+
+### Resultados
+
+_Pendiente._
+
+### Qué mejorar → v4
+
+_Llenar después de los partidos de v3._
 
 ---
 

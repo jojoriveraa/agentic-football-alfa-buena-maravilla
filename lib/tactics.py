@@ -39,15 +39,25 @@ SUPPORT_AHEAD = 14.0
 SUPPORT_WIDE = 10.0
 DRIBBLE_STEP = 12.0
 EDGE_MARGIN = 3.0
+KEEPER_MAX_DEPTH = 9.0
+"""How far off its goal line the keeper may stand."""
+KEEPER_MAX_WIDE = 9.0
+"""Half-width of the keeper's zone."""
+KEEPER_CHASE_RADIUS = 14.0
+"""Only a ball this close to our goal lets the keeper come out for it."""
+BACKWARD_MARGIN = 0.1
+"""Retreat, as a fraction of the half-length, that counts as running backward."""
+CHASE_COMMANDS = {"PRESS_BALL", "INTERCEPT", "MARK", "FOLLOW_PLAYER", "SLIDE_TACKLE"}
 DRIBBLE_ANGLES = (0.0, 35.0, -35.0, 60.0, -60.0)
 
 TEAM_PLAY_RULES = """## Team Play (hints are computed for the real pitch; these rules win over your role rules)
 - When YOUR PLAYER has the ball, a "WITH THE BALL" block lists your options:
-  1. distOppGoal <= shootRange → SHOOT.
+  1. distOppGoal <= shootRange → SHOOT (mid-range shots count: power 1.0), even under pressure.
   2. underPressure=True and no option marked open → carry the ball into space: MOVE_TO dribbleTo with sprint=true.
   3. Otherwise PASS to bestPass with the pass type shown.
   4. Never pass to an option marked FORBIDDEN (back pass near your own goal).
-- When a teammate has the ball, the state shows your supportSpot: MOVE_TO it to form a passing triangle with the ball carrier."""
+- When a teammate has the ball, the state shows your supportSpot: MOVE_TO it to form a passing triangle with the ball carrier.
+- When your team has the ball, never run back toward your own goal (except the defender)."""
 
 
 def attack_dir(team_id: int) -> int:
@@ -232,8 +242,10 @@ def support_spot(game_state: dict, team_id: int, my_player_id: int, position_lab
     elif position_label == "FWD2":
         x, y = bx + a * ahead, by - a * wide
     elif position_label == "MID":
+        # Level with the ball and wide, not behind it: the coach saw players
+        # dropping back in attack.
         side = -1 if by > 0 else 1
-        x, y = bx - a * 0.6 * ahead, by + side * wide
+        x, y = bx + a * 0.2 * ahead, by + side * 1.2 * wide
     else:  # DEF: safety, behind the ball and in our own half
         x, y = bx - a * 1.5 * ahead, by * 0.3
         x = min(x, 0.0) if a > 0 else max(x, 0.0)
@@ -256,7 +268,7 @@ def on_ball_decision(game_state: dict, team_id: int, my_player_id: int, position
         return _cmd("GK_DISTRIBUTE", my_player_id, team_id,
                     {"target_player_id": target if target is not None else 1, "method": "KICK"})
     if in_shooting_range(game_state, team_id, my_player_id):
-        return _cmd("SHOOT", my_player_id, team_id, {"aim_location": "CENTER", "power": 0.9})
+        return _cmd("SHOOT", my_player_id, team_id, {"aim_location": "CENTER", "power": 1.0})
     options = pass_options(game_state, team_id, my_player_id)
     under, _ = pressure(game_state, team_id, my_player_id)
     choice = best_pass(options)
@@ -268,6 +280,56 @@ def on_ball_decision(game_state: dict, team_id: int, my_player_id: int, position
                         {"target_x": target[0], "target_y": target[1], "sprint": True})
     return _cmd("PASS", my_player_id, team_id,
                 {"target_player_id": choice["id"], "type": pass_type(choice, scale)})
+
+
+def ball_near_our_goal(game_state: dict, team_id: int) -> bool:
+    scale = pitch_scale(game_state)
+    my_goal_x, _ = get_goal_positions(team_id, scale)
+    bpos = game_state.get("ball", {}).get("position", {})
+    return math.dist((bpos.get("x", 0), bpos.get("y", 0)), (my_goal_x, 0)) < KEEPER_CHASE_RADIUS * scale
+
+
+def keeper_move(game_state: dict, team_id: int, my_player_id: int) -> dict:
+    """Keeper's home spot: just off the line, between the ball and goal centre."""
+    scale = pitch_scale(game_state)
+    my_goal_x, _ = get_goal_positions(team_id, scale)
+    a = attack_dir(team_id)
+    by = game_state.get("ball", {}).get("position", {}).get("y", 0)
+    lim = 0.7 * KEEPER_MAX_WIDE * scale
+    return _cmd("MOVE_TO", my_player_id, team_id, {
+        "target_x": round(my_goal_x + a * 0.4 * KEEPER_MAX_DEPTH * scale, 2),
+        "target_y": round(max(-lim, min(lim, by * 0.5)), 2),
+        "sprint": False,
+    })
+
+
+def keeper_leaves_zone(cmd: dict, game_state: dict, team_id: int) -> bool:
+    """True when a keeper command would take it out of its zone for no reason."""
+    if ball_near_our_goal(game_state, team_id):
+        return False
+    ctype = cmd.get("commandType")
+    if ctype in CHASE_COMMANDS:
+        return True
+    if ctype == "MOVE_TO":
+        scale = pitch_scale(game_state)
+        my_goal_x, _ = get_goal_positions(team_id, scale)
+        p = cmd.get("parameters") or {}
+        x, y = p.get("target_x"), p.get("target_y")
+        if isinstance(x, (int, float)) and isinstance(y, (int, float)):
+            return abs(x - my_goal_x) > KEEPER_MAX_DEPTH * scale or abs(y) > KEEPER_MAX_WIDE * scale
+    return False
+
+
+def runs_backward(cmd: dict, game_state: dict, team_id: int, my_player_id: int) -> bool:
+    """True for a MOVE_TO toward our own goal by more than BACKWARD_MARGIN."""
+    if cmd.get("commandType") != "MOVE_TO":
+        return False
+    me, _, _ = _split(game_state, team_id, my_player_id)
+    tx = (cmd.get("parameters") or {}).get("target_x")
+    if not me or not isinstance(tx, (int, float)):
+        return False
+    half_length, _ = pitch_bounds(pitch_scale(game_state))
+    return attack_dir(team_id) * (tx - _xy(me)[0]) < -BACKWARD_MARGIN * half_length
 
 
 def team_play_lines(game_state: dict, team_id: int, my_player_id: int, position_label: str) -> list[str]:

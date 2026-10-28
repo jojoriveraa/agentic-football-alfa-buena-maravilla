@@ -105,8 +105,12 @@ REFERENCE_HALF_LENGTH = 55.0
 REFERENCE_HALF_WIDTH = 35.0
 _REFERENCE_GK_X = 50.0
 """Where a goalkeeper stands on the reference pitch (0.9 of the half-length)."""
-SHOOT_RANGE = 25.0
-"""Shooting distance to goal on the reference pitch, as the prompts used it."""
+SHOOT_RANGE = 35.0
+"""Shooting distance to goal on the reference pitch (mid-range included).
+
+The sample used 25; raised at the coach's request after the forwards rarely
+shot in the first four matches. 35 is about a third of the pitch length.
+"""
 
 
 def pitch_scale(game_state: dict) -> float:
