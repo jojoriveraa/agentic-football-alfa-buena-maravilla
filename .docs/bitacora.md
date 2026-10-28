@@ -11,6 +11,7 @@ Cómo llenarla: ver [README de .docs](README.md).
 | [v1](#v1--escala-del-campo-filtros-y-entrenador) | 2026-10-28 | Escala real del campo, filtros de comandos imposibles, instrucciones del entrenador | 1 | 0-0-1 | 0 / 1 |
 | [v2](#v2--juego-de-posesión-triangulaciones-autopase-y-despeje-largo) | 2026-10-28 | Triangulaciones, sin pases atrás en zona propia, autopase con presión, despeje largo del portero | 1 | 0-0-1 | 0 / 1 |
 | [v3](#v3--tiros-de-media-distancia-portero-en-su-arco-y-sin-retroceder-en-ataque) | 2026-10-28 | Tiros de media distancia, portero atado a su arco, nada de retroceder en ataque | 0 | – | – |
+| [v4](#v4--saber-de-verdad-quién-tiene-el-balón) | 2026-10-28 | Saber de verdad quién tiene el balón (v3 + corrección de posesión) | 0 | – | – |
 
 G-E-P = ganados, empatados, perdidos.
 
@@ -186,6 +187,46 @@ _Llenar después de los partidos de v3._
 
 ---
 
+## v4 — Saber de verdad quién tiene el balón
+
+**Desplegado en AgentCore:** versión 6 de los runtimes, 2026-10-28. v3 no llegó a jugar sola: los próximos partidos miden v3 y v4 juntas.
+
+### Hallazgo
+
+Al reconstruir los 4 partidos con [`tools/analizar_rivales.py`](../tools/analizar_rivales.py), la posesión del rival salía en 0%. El servidor identifica al que tiene el balón con `possessionAgentId` (por ejemplo `agentId_3`), pero ese id existe una vez en cada equipo. El código de ejemplo tomaba el primero de la lista, que es nuestro cuando jugamos de local.
+
+| Partido | Muestras en que nuestros agentes creían tener el balón y lo tenía el rival |
+|---|---|
+| P1 vs Benchmark FC | 22 de 61 (36%) |
+| P2 vs Total Attack United | 21 de 55 (38%) |
+| P3 vs Fort Knox Athletic | 22 de 58 (38%) |
+| P4 vs Benchmark FC | 26 de 90 (29%) |
+
+Efectos durante esos momentos:
+- se pedían pases y tiros en vez de defender;
+- los puntos de triángulo se ocupaban como si atacáramos;
+- el filtro de "no presionar el balón propio" **impedía presionar al rival que lo llevaba**.
+
+### Cambio
+
+- `lib/state.py`: si `possessionAgentId` coincide con un jugador de cada equipo, gana el más cerca del balón. Puede fallar un instante justo después de un cambio de posesión.
+- `lib/agent_base.py`: registra el objeto `ball` tal como llega cuando cambian sus campos, por si el servidor manda algún dato del equipo.
+- Pruebas: `test_helpers.give_ball()` entrega el balón moviéndolo a los pies del jugador. Las pruebas viejas solo cambiaban el id.
+
+### Qué esperamos ver
+
+| Métrica | Antes | Esperado |
+|---|---|---|
+| Razón `PRESS_BALL while our team has the ball` | 9-22 por partido (DEF) | Mucho menor: ahora sí se presiona al rival |
+| Razones `under pressure...` | 23 | Menos, porque desaparecen las posesiones falsas |
+| `conBalon` por jugador | inflado | Más bajo y real |
+
+### Resultados
+
+_Pendiente._
+
+---
+
 ## Pendientes de estrategia
 
 Ordenados por impacto esperado según los datos de v0. Regla: **un cambio por versión**, con 2 o 3 partidos contra el mismo rival antes de concluir, porque los modelos no responden igual cada vez.
@@ -196,7 +237,10 @@ Ordenados por impacto esperado según los datos de v0. Regla: **un cambio por ve
 4. **Formación.** El portal tiene `2-1-1`; los agentes juegan `1-1-2`. Alinear para que los saques de centro arranquen bien.
 5. **Plan de entrenador.** Completar los 5 nombres, usar las frases preparadas y confirmar en los registros el formato real de `teamChat`.
 6. **Por rival.** Contra Total Attack United, contragolpe: delanteros arriba esperando el balón. Contra Fort Knox Athletic, tiros desde media distancia.
-7. **Phase 3** (la fase de mejoras del taller): Memory, Gateway, Observability y Evaluations de AgentCore. Además, el portal da trofeos por usarlas (vamos 4 de 10).
+7. **Tiros de larga distancia** (oportunidad vista en los rivales). De 4 goles en contra reconstruidos con confianza, 2 vinieron desde lejos: a 4.8 unidades del arco (36% del largo) y a 6.5 (49%). Probar `shootRange` de unas 6.5 unidades para MID y delanteros.
+8. **Marcar al rival que se queda en nuestro arco.** En P4 un jugador de Benchmark estuvo todo el partido en x ≈ -6 (nuestro arco), sin marca. Los goles de cerca (P3 a 1.0, P2 a 0.2) son de ese tipo. Probar que el DEF lo marque con `MARK TIGHT` cuando el balón está en nuestra mitad.
+9. **Equipo demasiado atrás.** En P4, con el balón, la posición promedio fue DEF -4.6, MID -3.6, FWD1 -1.8 y FWD2 -2.2: todos en nuestra mitad. v3 y v4 deberían mejorarlo; medirlo con `tools/analizar_rivales.py`.
+10. **Phase 3** (la fase de mejoras del taller): Memory, Gateway, Observability y Evaluations de AgentCore. Además, el portal da trofeos por usarlas (vamos 4 de 10).
 
 ## Nota: el Match Report invierte las columnas de comandos
 

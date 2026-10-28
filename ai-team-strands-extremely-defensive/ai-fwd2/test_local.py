@@ -7,7 +7,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "lib"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
-from test_helpers import mock_agentcore, GAME_STATE, TEAM_ID
+from test_helpers import mock_agentcore, GAME_STATE, TEAM_ID, give_ball
 mock_agentcore()
 
 from state import summarize_state
@@ -41,8 +41,8 @@ def test_fallback_shoot():
     """FWD2 has ball near opponent goal — should SHOOT."""
     print(f"=== FALLBACK SHOOT ({POSITION_LABEL}) ===")
     state = json.loads(json.dumps(GAME_STATE))
-    state["ball"]["possessionAgentId"] = f"agentId_{MY_PLAYER_ID}"
     state["players"][4]["position"] = {"x": 40, "y": 8}  # near opp goal
+    give_ball(state, f"agentId_{MY_PLAYER_ID}")
     cmds = fallback_commands(state, TEAM_ID, MY_PLAYER_ID)
     for c in cmds:
         print(f"  P{c['playerId']}: {c['commandType']} {c.get('parameters', {})}")
@@ -56,8 +56,8 @@ def test_fallback_advance():
     """FWD2 has ball far from goal — should advance with MOVE_TO."""
     print(f"=== FALLBACK ADVANCE ({POSITION_LABEL}) ===")
     state = json.loads(json.dumps(GAME_STATE))
-    state["ball"]["possessionAgentId"] = f"agentId_{MY_PLAYER_ID}"
     state["players"][4]["position"] = {"x": 10, "y": 8}  # far from goal
+    give_ball(state, f"agentId_{MY_PLAYER_ID}")
     cmds = fallback_commands(state, TEAM_ID, MY_PLAYER_ID)
     for c in cmds:
         print(f"  P{c['playerId']}: {c['commandType']} {c.get('parameters', {})}")

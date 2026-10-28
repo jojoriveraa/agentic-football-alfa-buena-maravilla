@@ -58,6 +58,17 @@ def test_rendered_prompt_is_not_self_contradictory():
     print("=== PROMPT: away p3 told opponent holds it, and hasBall=False ===")
 
 
+def test_ambiguous_holder_is_the_one_near_the_ball():
+    """Both teams have agentId_3; the away one is next to the ball here."""
+    gs = copy.deepcopy(GAME_STATE)
+    gs["ball"]["position"] = {"x": 29.5, "y": -11.5, "z": 0}  # away P3 is at (30, -12)
+    ball, players = gs["ball"], gs["players"]
+    assert holder_is_me(ball, players, AWAY, HOLDER_IDX) is True
+    assert holder_is_me(ball, players, HOME, HOLDER_IDX) is False
+    assert get_possession_info(ball, players, HOME)[1] == "OPP player 3"
+    print("=== HOLDER: ambiguous agentId resolved to the player at the ball ===")
+
+
 def test_server_isfree_is_honoured():
     """isFree is authoritative; it was previously ignored entirely."""
     assert get_possession_info(_ball(isFree=True), _players(), HOME) == (None, "free", False)

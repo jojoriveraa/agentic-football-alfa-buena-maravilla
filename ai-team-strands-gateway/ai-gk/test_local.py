@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "lib"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
-from test_helpers import mock_agentcore_gateway, GAME_STATE, TEAM_ID
+from test_helpers import mock_agentcore_gateway, GAME_STATE, TEAM_ID, give_ball
 os.environ.setdefault("GATEWAY_URL", "https://test-gateway.example.com")
 os.environ.setdefault("GATEWAY_ACCESS_TOKEN", "test-token")
 mock_agentcore_gateway()

@@ -126,6 +126,14 @@ def create_invoke_handler(
             my_players = prompt_data.get("myPlayers", [my_player_id])
             effective_pid = my_players[0] if my_players else my_player_id
 
+            # The ball's possession fields decide who "has the ball" and the
+            # holder id is ambiguous across teams; log their raw shape once
+            # per new key set in case the server adds a team discriminator.
+            ball_keys = sorted((game_state.get("ball") or {}).keys())
+            if ball_keys != last_chat.get("ball_keys"):
+                last_chat["ball_keys"] = ball_keys
+                log.info(f"{position_label} ball fields: {json.dumps(game_state.get('ball'), default=str)[:500]}")
+
             team_chat = game_state.get("teamChat")
             if team_chat:
                 raw_chat = json.dumps(team_chat, default=str)

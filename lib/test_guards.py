@@ -84,6 +84,7 @@ def test_fallback_scales_with_pitch():
     for p in gs2["players"]:
         if p["agentId"] == "agentId_3" and p["teamCode"] == "home":
             p["position"] = {"x": 4.6, "y": 0.0}
+    gs2["ball"]["position"] = {"x": 4.6, "y": 0.0, "z": 0}
     fwd = build_fallback(FWD1_CONFIG)(gs2, HOME, 3)[0]
     assert fwd["commandType"] == "SHOOT", fwd
     print("=== FALLBACK: positions and shooting range follow the pitch ===")

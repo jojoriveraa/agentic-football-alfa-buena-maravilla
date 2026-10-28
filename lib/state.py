@@ -49,16 +49,16 @@ def _resolve_holder(ball: dict, players: list):
     """Return the player dict holding the ball, or None.
 
     agentId is not unique across teams — the same agentId_N appears once per
-    team — so an id match alone cannot always identify the player. When the
-    id is ambiguous we keep the long-standing behaviour of taking the first
-    match in players[], rather than guessing: a positional tie-break on
-    distance to the ball looks appealing but picks the wrong team whenever
-    possession has just changed and the ball has not yet caught up.
+    team — so an id match alone cannot always identify the player. The sample
+    took the first match in players[], which the live server lists home
+    first: playing as HOME, every opponent possession read as ours. Rebuilding
+    four matches from the agents' own states showed our agents believed they
+    had the ball while the opponent held it in 29-38% of samples.
 
-    Ambiguity is therefore no worse than before. What changes is that the
-    team is now checked against the resolved holder (see holder_is_me), so a
-    player can no longer act on a ball the opposing player of the same index
-    is carrying.
+    When the id is ambiguous, the candidate closest to the ball wins. It can
+    still be wrong for a moment right after possession changes, before the
+    ball catches up with the new holder; that is far rarer than the
+    systematic error it replaces.
 
     TODO: drop the ambiguity entirely once the server exposes a globally
     unique player id, or sends a team discriminator alongside possession.
@@ -66,6 +66,9 @@ def _resolve_holder(ball: dict, players: list):
     holder_agent = ball.get("possessionAgentId")
     if isinstance(holder_agent, str):
         matches = [p for p in players if p.get("agentId") == holder_agent]
+        bpos = ball.get("position")
+        if len(matches) > 1 and isinstance(bpos, dict):
+            return min(matches, key=lambda p: dist(p.get("position", {}), bpos))
     else:
         pid = ball.get("possessionPlayerId")
         if pid is None:

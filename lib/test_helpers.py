@@ -152,3 +152,17 @@ GAME_STATE = {
     ],
     "teamChat": [],
 }
+
+
+def give_ball(state: dict, agent_id: str, team_code: str = "home") -> None:
+    """Hand the ball to a player: possession id AND ball position.
+
+    agentId repeats across teams, so possession is resolved by distance to the
+    ball (state._resolve_holder). Setting only possessionAgentId leaves the
+    ball wherever it was and may hand it to the opponent with the same id.
+    """
+    player = next(p for p in state["players"]
+                  if p["agentId"] == agent_id and p["teamCode"] == team_code)
+    state["ball"]["possessionAgentId"] = agent_id
+    state["ball"]["isFree"] = False
+    state["ball"]["position"] = {**player["position"], "z": 0}

@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "lib"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
-from test_helpers import mock_agentcore_memory, GAME_STATE, TEAM_ID
+from test_helpers import mock_agentcore_memory, GAME_STATE, TEAM_ID, give_ball
 os.environ.setdefault("MEMORY_ID", "test-memory-id")
 os.environ.setdefault("TEAM_ID", str(TEAM_ID))
 mock_agentcore_memory()
