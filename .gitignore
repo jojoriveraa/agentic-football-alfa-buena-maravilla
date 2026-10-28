@@ -1,0 +1,6 @@
+.venv/
+_build/
+__pycache__/
+*.pyc
+.bedrock_agentcore.yaml
+.DS_Store
