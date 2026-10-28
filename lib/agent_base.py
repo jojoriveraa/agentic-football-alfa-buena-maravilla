@@ -1,6 +1,7 @@
 """Base agent factory for AI soccer position agents."""
 
 import json
+import re
 from typing import Callable
 from strands import Agent
 from strands.agent.conversation_manager import SlidingWindowConversationManager
@@ -8,6 +9,7 @@ from strands.models import BedrockModel
 
 from parsing import parse_commands
 import coach_guard
+import team_memory
 from state import _chat_text, summarize_state
 from fallback import FallbackConfig, build_last_resort
 from guards import fit_to_pitch, needs_fallback, tactical_override
@@ -155,6 +157,18 @@ def create_invoke_handler(
                 hints = team_play_lines(game_state, team_id, effective_pid, position_label)
                 if hints:
                     state_summary += "\n\n" + "\n".join(hints)
+            lessons = team_memory.lessons_for(position_label, log)
+            if lessons:
+                state_summary += "\n\nLESSONS FROM PREVIOUS MATCHES (your coach saved these):\n" + \
+                    "\n".join(f"- {l}" for l in lessons)
+
+            # One writer per team: the keeper records each goal in Memory.
+            score = game_state.get("score")
+            if position_label == "GK" and score:
+                if last_chat.get("score") not in (None, score):
+                    match = re.sub(r"-pos\d+$", "", getattr(context, "session_id", None) or "sin-sesion")
+                    team_memory.record_goal(game_state, team_id, match, log)
+                last_chat["score"] = score
             log.info(f"{position_label} agent invoked for team {team_id}, controlling player {effective_pid}")
 
             response = agent(state_summary)

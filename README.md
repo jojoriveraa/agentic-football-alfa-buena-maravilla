@@ -13,6 +13,7 @@ Parte del código de ejemplo de AWS (`aws-samples/sample-ai-possibilities`, carp
 - **Instrucciones del entrenador.** Los agentes leen `teamChat`, el campo donde llegan los mensajes que mandas desde el portal.
 - **Herramienta de análisis por partido:** [`tools/analizar_partido.py`](tools/analizar_partido.py).
 - **Componentes de AgentCore** (Phase 3, la fase de mejoras del taller): un guardrail (filtro de Bedrock) contra los mensajes del coach rival que intentan manipular a nuestros agentes, Evaluations (un modelo juez califica las jugadas), Code Interpreter y Browser. Se crean con [`tools/crear_componentes.py`](tools/crear_componentes.py); el detalle está en la [bitácora, v6](.docs/bitacora.md#v6--componentes-de-agentcore-guardrail-evaluations-code-interpreter-y-browser).
+- **Lecciones entre partidos** (Memory y Gateway de AgentCore): el coach guarda lecciones con `tools/lecciones.py` y los agentes las leen al arrancar cada partido, sin volver a desplegar. Ver la [bitácora, v7](.docs/bitacora.md#v7--memory-y-gateway-lecciones-entre-partidos).
 
 ## Estructura
 
@@ -23,13 +24,17 @@ lib/                          # Biblioteca compartida por todos los equipos
   fallback.py                 #   Lógica de respaldo por posición (cuando el modelo falla)
   agent_base.py               #   Crea el agente y maneja cada llamada
   coach_guard.py              #   Filtra los mensajes del coach con el guardrail
+  team_memory.py              #   Lecciones y goles en AgentCore Memory
 ai-team-strands-balanced/     # Nuestro equipo (5 agentes: ai-gk, ai-def, ai-mid, ai-fwd1, ai-fwd2)
 ai-team-strands-*/            # Otros equipos de ejemplo de AWS (agresivo, defensivo, memoria, gateway)
 tools/analizar_partido.py     # Reporte post-partido desde CloudWatch (el servicio de registros de AWS)
 tools/analizar_rivales.py     # Origen de los goles y formas de juego de ambos equipos
-tools/crear_componentes.py    # Crea guardrail, evaluador, Code Interpreter y Browser (idempotente)
+tools/crear_componentes.py    # Crea guardrail, evaluador, Code Interpreter, Browser, Memory y Gateway (idempotente)
 tools/analisis_sandbox.py     # Tendencia de la temporada, calculada en el Code Interpreter
 tools/leer_taller.py          # Lee páginas del taller con el Browser de AgentCore
+tools/lecciones.py            # Guarda, lista y borra lecciones; lista los goles registrados
+tools/coach_mcp.py            # Llama a las herramientas del coach a través del Gateway (MCP)
+tools/gateway_coach/          # Lambda de las herramientas del coach
 .docs/                        # Bitácora de versiones y reportes de partidos
 ```
 

@@ -14,6 +14,7 @@ Cómo llenarla: ver [README de .docs](README.md).
 | [v4](#v4--saber-de-verdad-quién-tiene-el-balón) | 2026-10-28 | Saber de verdad quién tiene el balón (v3 + corrección de posesión) | 1 | 0-0-1 | 0 / 1 |
 | [v5](#v5--primer-defensor-alguien-siempre-va-por-el-balón) | 2026-10-28 | Primer defensor: el más cercano siempre va por el balón | 0 | – | – |
 | [v6](#v6--componentes-de-agentcore-guardrail-evaluations-code-interpreter-y-browser) | 2026-10-28 | v5 + filtro de mensajes del coach rival (Guardrails); fuera del partido: Evaluations, Code Interpreter y Browser | 0 | – | – |
+| [v7](#v7--memory-y-gateway-lecciones-entre-partidos) | 2026-10-28 | Memory: lecciones entre partidos sin redesplegar; Gateway: herramientas del coach por MCP | 0 | – | – |
 
 G-E-P = ganados, empatados, perdidos.
 
@@ -315,6 +316,46 @@ _Pendiente._
 
 ---
 
+## v7 — Memory y Gateway: lecciones entre partidos
+
+**Desplegado en AgentCore:** versión 9 de los runtimes, 2026-10-28. Sin lecciones guardadas juega igual que v6; cada lección que se guarde cuenta como un experimento propio.
+
+### Cambios
+
+| Componente | Recurso | Qué hace |
+|---|---|---|
+| Memory (memoria de AgentCore) | `afwc_lecciones`, solo eventos, sin estrategias de extracción | `lib/team_memory.py`: cada agente lee las lecciones una vez, en su primer tick del partido (0.5 s una sola vez), y las muestra al modelo en cada tick como `LESSONS FROM PREVIOUS MATCHES`. Cada lección es para todos o para una posición. El portero guarda cada gol (marcador, balón y posiciones) en segundo plano, sin frenar el tick. |
+| Gateway (publica herramientas para agentes por MCP, el protocolo de herramientas) | `afwc-coach-tools`, autenticación IAM | Una Lambda (`afwc-coach-tools`) con 4 herramientas: `listar_lecciones`, `guardar_leccion`, `borrar_leccion`, `listar_goles`. Con IAM solo entra quien tenga credenciales de la cuenta, porque estas herramientas escriben en el prompt de los agentes. `tools/coach_mcp.py` las llama firmando con SigV4 (la firma de AWS). |
+
+Por qué no se usó el diseño del equipo de ejemplo:
+
+- **Memory de ejemplo** (`AgentCoreMemorySessionManager`): lee y guarda todo el historial en cada tick. Suma latencia en cada jugada y le devuelve al modelo jugadas viejas, que es lo que v1 quitó porque el portero copiaba sus respuestas anteriores.
+- **Gateway de ejemplo** (herramientas tácticas en el partido): las Lambdas asumen el campo de referencia (arcos en ±55) y el campo real es unas 10 veces más chico. Además, el modelo tiene que copiar todo el estado en cada llamada: unos 1.2 s más por tick. Nuestras pistas ya calculan pases y tiros con la escala correcta.
+
+### Cómo usarlo
+
+```bash
+python3 tools/lecciones.py                                   # ver lecciones
+python3 tools/lecciones.py add "texto en inglés" --pos mid   # guardar (aplica desde el siguiente partido)
+python3 tools/lecciones.py delete <id>
+python3 tools/lecciones.py goles                             # goles que registró el portero
+python3 tools/coach_mcp.py listar_lecciones                  # lo mismo, pasando por el Gateway
+```
+
+### Qué esperamos ver
+
+| Métrica | Antes | Esperado |
+|---|---|---|
+| Latencia del primer tick | ~0.6 s | ~1.1 s una vez por partido |
+| Latencia p50 | 0.6 s | Igual |
+| Efecto en el juego | – | Ninguno sin lecciones; con lecciones se mide con el juez de Evaluations y el marcador |
+
+### Resultados
+
+_Pendiente._
+
+---
+
 ## Pendientes de estrategia
 
 Ordenados por impacto esperado según los datos de v0. Regla: **un cambio por versión**, con 2 o 3 partidos contra el mismo rival antes de concluir, porque los modelos no responden igual cada vez.
@@ -328,7 +369,7 @@ Ordenados por impacto esperado según los datos de v0. Regla: **un cambio por ve
 7. **Tiros de larga distancia** (oportunidad vista en los rivales). De 4 goles en contra reconstruidos con confianza, 2 vinieron desde lejos: a 4.8 unidades del arco (36% del largo) y a 6.5 (49%). Probar `shootRange` de unas 6.5 unidades para MID y delanteros.
 8. **Marcar al rival que se queda en nuestro arco.** En P4 un jugador de Benchmark estuvo todo el partido en x ≈ -6 (nuestro arco), sin marca. Los goles de cerca (P3 a 1.0, P2 a 0.2) son de ese tipo. Probar que el DEF lo marque con `MARK TIGHT` cuando el balón está en nuestra mitad.
 9. **Equipo demasiado atrás.** En P4, con el balón, la posición promedio fue DEF -4.6, MID -3.6, FWD1 -1.8 y FWD2 -2.2: todos en nuestra mitad. v3 y v4 deberían mejorarlo; medirlo con `tools/analizar_rivales.py`.
-10. **Phase 3** (la fase de mejoras del taller): con v6 ya están Guardrails, Evaluations, Code Interpreter y Browser. Siguen Memory (recordar entre jugadas, unos +250 ms por tick) y Gateway (herramientas vía Lambda, unos +1.2 s por tick), uno por versión y con partidos de por medio.
+10. **Phase 3** (la fase de mejoras del taller): con v6 y v7 ya están los 6 componentes que faltaban. Los puntos 7, 8 y 9 ya se pueden probar como lecciones de Memory, una a la vez, sin redesplegar.
 
 ## Nota: el Match Report invierte las columnas de comandos
 

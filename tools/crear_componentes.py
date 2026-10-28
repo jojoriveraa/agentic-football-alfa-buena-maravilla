@@ -11,8 +11,11 @@ account-specific ids, so it is git-ignored; each account runs this once.
 """
 
 import argparse
+import io
 import json
 import os
+import time
+import zipfile
 
 import boto3
 
@@ -25,6 +28,12 @@ EVALUATOR_NAME = "afwc_decision_quality"
 ONLINE_EVAL_NAME = "afwc_partidos"
 CODE_INTERPRETER_NAME = "afwc_analisis"
 BROWSER_NAME = "afwc_navegador"
+MEMORY_NAME = "afwc_lecciones"
+GATEWAY_NAME = "afwc-coach-tools"
+GATEWAY_ROLE_NAME = "AgentCore-afwc-gateway-role"
+COACH_LAMBDA_NAME = "afwc-coach-tools"
+COACH_LAMBDA_ROLE_NAME = "AgentCore-afwc-coach-lambda"
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 JUDGE_MODEL = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 AGENTS = ["ai_gk_agent", "ai_def_agent", "ai_mid_agent", "ai_fwd1_agent", "ai_fwd2_agent"]
 
@@ -206,6 +215,147 @@ def browser(ctl, create: bool):
     )["browserId"]
 
 
+def memory(ctl, create: bool):
+    """Short-term memory (raw events, no extraction strategies) holding the
+    lessons tools/lecciones.py saves and the goals the keeper records."""
+    for page in ctl.get_paginator("list_memories").paginate():
+        for m in page["memories"]:
+            if m["id"].startswith(MEMORY_NAME + "-"):
+                return {"id": m["id"], "arn": m["arn"]}
+    if not create:
+        return None
+    m = ctl.create_memory(
+        name=MEMORY_NAME,
+        description="Lecciones entre partidos y goles registrados por el portero",
+        eventExpiryDuration=365,
+    )["memory"]
+    return {"id": m["id"], "arn": m["arn"]}
+
+
+def grant_memory(iam, ctl, memory_arn: str):
+    """Let each of our runtimes read lessons and write goal events."""
+    policy = json.dumps({"Version": "2012-10-17", "Statement": [{
+        "Effect": "Allow",
+        "Action": ["bedrock-agentcore:CreateEvent", "bedrock-agentcore:ListEvents", "bedrock-agentcore:GetEvent"],
+        "Resource": memory_arn,
+    }]})
+    for page in ctl.get_paginator("list_agent_runtimes").paginate():
+        for r in page["agentRuntimes"]:
+            if r["agentRuntimeName"] in AGENTS:
+                role = ctl.get_agent_runtime(agentRuntimeId=r["agentRuntimeId"])["roleArn"].split("/")[-1]
+                iam.put_role_policy(RoleName=role, PolicyName="afwc-memory", PolicyDocument=policy)
+
+
+COACH_TOOLS = [
+    {"name": "listar_lecciones", "description": "List the lessons every agent reads at kickoff, with id and position.",
+     "inputSchema": {"type": "object", "properties": {}}},
+    {"name": "guardar_leccion",
+     "description": "Save a lesson for the next matches: one concrete instruction in English, up to 300 characters.",
+     "inputSchema": {"type": "object", "properties": {
+         "texto": {"type": "string", "description": "The instruction, as the model will read it"},
+         "pos": {"type": "string", "description": "all, gk, def, mid, fwd1 or fwd2 (default all)"}},
+         "required": ["texto"]}},
+    {"name": "borrar_leccion", "description": "Delete a lesson by its id.",
+     "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}},
+    {"name": "listar_goles", "description": "Goals the keeper recorded: game time, score, ball and player positions.",
+     "inputSchema": {"type": "object", "properties": {}}},
+]
+
+
+def _role(iam, name: str, service: str, account: str, policy: dict, description: str) -> str:
+    """Create the role if missing and (re)write its inline policy."""
+    try:
+        arn = iam.get_role(RoleName=name)["Role"]["Arn"]
+    except iam.exceptions.NoSuchEntityException:
+        trust = {"Version": "2012-10-17", "Statement": [{
+            "Effect": "Allow", "Principal": {"Service": service}, "Action": "sts:AssumeRole",
+            "Condition": {"StringEquals": {"aws:SourceAccount": account}}}]}
+        arn = iam.create_role(RoleName=name, AssumeRolePolicyDocument=json.dumps(trust),
+                              Description=description)["Role"]["Arn"]
+    iam.put_role_policy(RoleName=name, PolicyName="afwc", PolicyDocument=json.dumps(policy))
+    return arn
+
+
+def coach_lambda(iam, lam, account: str, memory: dict) -> str:
+    """Lambda with the coach tools, packaged with lib/team_memory.py."""
+    role = _role(iam, COACH_LAMBDA_ROLE_NAME, "lambda.amazonaws.com", account, {"Version": "2012-10-17", "Statement": [
+        {"Effect": "Allow", "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+         "Resource": f"arn:aws:logs:{REGION}:{account}:log-group:/aws/lambda/{COACH_LAMBDA_NAME}:*"},
+        {"Effect": "Allow", "Action": ["bedrock-agentcore:CreateEvent", "bedrock-agentcore:ListEvents",
+                                       "bedrock-agentcore:GetEvent", "bedrock-agentcore:DeleteEvent"],
+         "Resource": memory["arn"]},
+    ]}, "Coach tools Lambda - reads and writes the team lessons in AgentCore Memory")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.write(os.path.join(ROOT, "tools", "gateway_coach", "lambda_function.py"), "lambda_function.py")
+        z.write(os.path.join(ROOT, "lib", "team_memory.py"), "team_memory.py")
+    code = buf.getvalue()
+    env = {"Variables": {"AFWC_MEMORY_ID": memory["id"]}}
+    try:
+        arn = lam.get_function(FunctionName=COACH_LAMBDA_NAME)["Configuration"]["FunctionArn"]
+        lam.update_function_code(FunctionName=COACH_LAMBDA_NAME, ZipFile=code)
+        lam.get_waiter("function_updated_v2").wait(FunctionName=COACH_LAMBDA_NAME)
+        lam.update_function_configuration(FunctionName=COACH_LAMBDA_NAME, Environment=env)
+        return arn
+    except lam.exceptions.ResourceNotFoundException:
+        pass
+    for attempt in range(10):  # a new role takes a few seconds to be assumable
+        try:
+            return lam.create_function(
+                FunctionName=COACH_LAMBDA_NAME, Runtime="python3.13", Role=role,
+                Handler="lambda_function.lambda_handler", Code={"ZipFile": code},
+                Timeout=15, MemorySize=256, Environment=env,
+                Description="Herramientas del coach detras del AgentCore Gateway",
+            )["FunctionArn"]
+        except lam.exceptions.InvalidParameterValueException:
+            if attempt == 9:
+                raise
+            time.sleep(5)
+
+
+def gateway(iam, ctl, account: str, lambda_arn: str):
+    """MCP gateway with IAM auth (only principals of this account can call
+    it, since the tools write into the agents' prompts) and one Lambda
+    target with the coach tools."""
+    role = _role(iam, GATEWAY_ROLE_NAME, "bedrock-agentcore.amazonaws.com", account, {
+        "Version": "2012-10-17", "Statement": [
+            {"Effect": "Allow", "Action": "lambda:InvokeFunction", "Resource": lambda_arn}]},
+        "AgentCore Gateway - invokes the coach tools Lambda")
+    gw = next((g for page in ctl.get_paginator("list_gateways").paginate()
+               for g in page["items"] if g["name"] == GATEWAY_NAME), None)
+    if gw:
+        gw_id = gw["gatewayId"]
+    else:
+        for attempt in range(10):
+            try:
+                gw_id = ctl.create_gateway(
+                    name=GATEWAY_NAME, roleArn=role, protocolType="MCP", authorizerType="AWS_IAM",
+                    description="Herramientas del coach: lecciones y goles en AgentCore Memory",
+                )["gatewayId"]
+                break
+            except ctl.exceptions.ValidationException:
+                if attempt == 9:
+                    raise
+                time.sleep(5)
+    while ctl.get_gateway(gatewayIdentifier=gw_id)["status"] == "CREATING":
+        time.sleep(3)
+    targets = {t["name"] for t in ctl.list_gateway_targets(gatewayIdentifier=gw_id)["items"]}
+    for attempt in range(10 if "coach" not in targets else 0):
+        try:  # the new gateway role also takes a few seconds to be assumable
+            ctl.create_gateway_target(
+                gatewayIdentifier=gw_id, name="coach", description="Lecciones y goles del equipo",
+                targetConfiguration={"mcp": {"lambda": {"lambdaArn": lambda_arn,
+                                                        "toolSchema": {"inlinePayload": COACH_TOOLS}}}},
+                credentialProviderConfigurations=[{"credentialProviderType": "GATEWAY_IAM_ROLE"}],
+            )
+            break
+        except ctl.exceptions.ValidationException:
+            if attempt == 9:
+                raise
+            time.sleep(6)
+    return {"id": gw_id, "url": f"https://{gw_id}.gateway.bedrock-agentcore.{REGION}.amazonaws.com/mcp"}
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--show", action="store_true", help="do not create anything")
@@ -233,6 +383,14 @@ def main():
     br = browser(ctl, create)
     if br:
         resources["browser_id"] = br
+    mem = memory(ctl, create)
+    if mem:
+        resources["memory_id"] = mem["id"]
+        if create:
+            grant_memory(boto3.client("iam"), ctl, mem["arn"])
+            iam = boto3.client("iam")
+            fn = coach_lambda(iam, boto3.client("lambda", region_name=REGION), account, mem)
+            resources["coach_gateway"] = gateway(iam, ctl, account, fn)
 
     print(json.dumps(resources, indent=2))
     if create:
