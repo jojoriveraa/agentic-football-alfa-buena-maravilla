@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 .bedrock_agentcore.yaml
 .DS_Store
+lib/agentcore_resources.json

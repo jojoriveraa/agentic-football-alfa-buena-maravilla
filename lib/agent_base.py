@@ -7,7 +7,8 @@ from strands.agent.conversation_manager import SlidingWindowConversationManager
 from strands.models import BedrockModel
 
 from parsing import parse_commands
-from state import summarize_state
+import coach_guard
+from state import _chat_text, summarize_state
 from fallback import FallbackConfig, build_last_resort
 from guards import fit_to_pitch, needs_fallback, tactical_override
 from state import holder_is_me
@@ -142,6 +143,10 @@ def create_invoke_handler(
                 if raw_chat != last_chat["raw"]:
                     last_chat["raw"] = raw_chat
                     log.info(f"{position_label} teamChat changed: {raw_chat[:1000]}")
+                if coach_guard.enabled():
+                    kept = [e for e in team_chat if coach_guard.allowed(_chat_text(e), log)]
+                    if len(kept) != len(team_chat):
+                        game_state = {**game_state, "teamChat": kept}
 
             state_summary = summarize_state(
                 game_state, team_id, effective_pid, position_label, player_name

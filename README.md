@@ -12,6 +12,7 @@ Parte del código de ejemplo de AWS (`aws-samples/sample-ai-possibilities`, carp
 - **Filtros de comandos imposibles.** Nada de sacar, pasar o tirar sin balón, ni presionar a un compañero.
 - **Instrucciones del entrenador.** Los agentes leen `teamChat`, el campo donde llegan los mensajes que mandas desde el portal.
 - **Herramienta de análisis por partido:** [`tools/analizar_partido.py`](tools/analizar_partido.py).
+- **Componentes de AgentCore** (Phase 3, la fase de mejoras del taller): un guardrail (filtro de Bedrock) contra los mensajes del coach rival que intentan manipular a nuestros agentes, Evaluations (un modelo juez califica las jugadas), Code Interpreter y Browser. Se crean con [`tools/crear_componentes.py`](tools/crear_componentes.py); el detalle está en la [bitácora, v6](.docs/bitacora.md#v6--componentes-de-agentcore-guardrail-evaluations-code-interpreter-y-browser).
 
 ## Estructura
 
@@ -21,9 +22,14 @@ lib/                          # Biblioteca compartida por todos los equipos
   guards.py                   #   Filtros de comandos imposibles
   fallback.py                 #   Lógica de respaldo por posición (cuando el modelo falla)
   agent_base.py               #   Crea el agente y maneja cada llamada
+  coach_guard.py              #   Filtra los mensajes del coach con el guardrail
 ai-team-strands-balanced/     # Nuestro equipo (5 agentes: ai-gk, ai-def, ai-mid, ai-fwd1, ai-fwd2)
 ai-team-strands-*/            # Otros equipos de ejemplo de AWS (agresivo, defensivo, memoria, gateway)
 tools/analizar_partido.py     # Reporte post-partido desde CloudWatch (el servicio de registros de AWS)
+tools/analizar_rivales.py     # Origen de los goles y formas de juego de ambos equipos
+tools/crear_componentes.py    # Crea guardrail, evaluador, Code Interpreter y Browser (idempotente)
+tools/analisis_sandbox.py     # Tendencia de la temporada, calculada en el Code Interpreter
+tools/leer_taller.py          # Lee páginas del taller con el Browser de AgentCore
 .docs/                        # Bitácora de versiones y reportes de partidos
 ```
 
@@ -35,6 +41,7 @@ Requisitos: Python 3.10 o más nuevo, AWS CLI, `zip`, `rsync` y [uv](https://doc
 python3 -m venv .venv && source .venv/bin/activate
 pip install strands-agents bedrock-agentcore-starter-toolkit
 pip install -r ai-team-strands-balanced/ai-gk/requirements.txt
+pip install playwright                                        # solo para tools/leer_taller.py
 
 # Pruebas sin AWS
 (cd lib && python3 test_state.py && python3 test_guards.py && python3 test_parsing.py)
@@ -43,6 +50,7 @@ python3 ai-team-strands-balanced/ai-gk/test_local.py
 # Con las credenciales del taller (Workshop Studio → "Get AWS CLI credentials")
 export AWS_DEFAULT_REGION=us-east-1
 python3 ai-team-strands-balanced/ai-gk/test_local.py --llm   # prueba con el modelo real
+python3 tools/crear_componentes.py                           # una vez por cuenta, antes del despliegue
 cd ai-team-strands-balanced && ./deploy-all.sh                # despliega los 5 agentes
 ./deploy-all.sh ai-mid                                        # o solo uno
 cd .. && python3 tools/analizar_partido.py                    # analiza el último partido
