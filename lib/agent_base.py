@@ -9,7 +9,9 @@ from strands.models import BedrockModel
 from parsing import parse_commands
 from state import summarize_state
 from fallback import FallbackConfig, build_last_resort
-from guards import fit_to_pitch, needs_fallback
+from guards import fit_to_pitch, needs_fallback, tactical_override
+from state import holder_is_me
+from tactics import on_ball_decision, support_move, team_play_lines
 
 
 def create_agent(
@@ -77,6 +79,7 @@ def create_invoke_handler(
     fallback_fn: Callable[[dict, int, int], list[dict]],
     fallback_cfg: FallbackConfig,
     player_name: str | None = None,
+    team_play: bool = False,
 ):
     """Create and register the @app.entrypoint invoke handler.
 
@@ -87,12 +90,26 @@ def create_invoke_handler(
 
     player_name should match the name set for this player on the Player
     Portal's My Team page, so coach messages addressed by name reach it.
+
+    team_play turns on tactics.py: triangle and passing hints in the state,
+    the team-play rules in guards.tactical_override(), and team-play
+    replacements whenever a model command is overridden.
     """
     log = app.logger
     last_resort = build_last_resort(fallback_cfg, my_player_id)
     # teamChat's entry schema is undocumented: log the raw array whenever it
     # changes, so the first match with coaching shows its real shape.
     last_chat = {"raw": None}
+
+    def replacement(game_state, team_id, pid):
+        """What to play instead of an overridden or unparseable command."""
+        if team_play:
+            if holder_is_me(game_state.get("ball", {}), game_state.get("players", []), team_id, pid):
+                return [on_ball_decision(game_state, team_id, pid, position_label)]
+            support = support_move(game_state, team_id, pid, position_label)
+            if support:
+                return [support]
+        return fallback_fn(game_state, team_id, pid)
 
     @app.entrypoint
     async def invoke(payload, context):
@@ -117,6 +134,10 @@ def create_invoke_handler(
             state_summary = summarize_state(
                 game_state, team_id, effective_pid, position_label, player_name
             )
+            if team_play:
+                hints = team_play_lines(game_state, team_id, effective_pid, position_label)
+                if hints:
+                    state_summary += "\n\n" + "\n".join(hints)
             log.info(f"{position_label} agent invoked for team {team_id}, controlling player {effective_pid}")
 
             response = agent(state_summary)
@@ -134,12 +155,17 @@ def create_invoke_handler(
                 log.info(f"LLM returned {len(commands)} commands: "
                          f"{[c.get('commandType') for c in commands]}")
                 reason = needs_fallback(commands, game_state, team_id, effective_pid)
+                if not reason and team_play:
+                    reason = tactical_override(
+                        commands, game_state, team_id, effective_pid, position_label
+                    )
                 if reason:
-                    log.warn(f"{position_label} overriding model ({reason}), using fallback")
-                    commands = fallback_fn(game_state, team_id, effective_pid)
+                    commands = replacement(game_state, team_id, effective_pid)
+                    log.warn(f"{position_label} overriding model ({reason}), playing "
+                             f"{[c.get('commandType') for c in commands]}")
             else:
                 log.warn(f"LLM parse failed, using fallback. Response: {response_text[:200]}")
-                commands = fallback_fn(game_state, team_id, effective_pid)
+                commands = replacement(game_state, team_id, effective_pid)
                 log.info(f"Fallback returned {len(commands)} commands")
 
             for note in fit_to_pitch(commands, game_state):

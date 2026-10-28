@@ -8,6 +8,7 @@ rule-based fallback decide instead.
 """
 
 from state import get_possession_info, holder_is_me, pitch_bounds, pitch_scale
+from tactics import in_shooting_range, pass_options, pressure
 
 POSSESSION_COMMANDS = {"PASS", "SHOOT", "GK_DISTRIBUTE"}
 """Commands that only do something when this player holds the ball."""
@@ -30,6 +31,45 @@ def needs_fallback(commands: list[dict], game_state: dict, team_id: int, my_play
             return f"{ctype} without the ball"
         if ctype in OUT_OF_POSSESSION_COMMANDS and get_possession_info(ball, players, team_id)[2]:
             return f"{ctype} while our team has the ball"
+    return None
+
+
+def tactical_override(commands: list[dict], game_state: dict, team_id: int, my_player_id: int,
+                      position_label: str):
+    """Reason string when a possible command breaks a team-play rule, else None.
+
+    Rules for the player holding the ball (tactics.on_ball_decision replaces
+    the command):
+      - the goalkeeper always clears long;
+      - no back pass inside our defensive third;
+      - under pressure, carry the ball into space unless the model chose an
+        open, unblocked pass or a shot in range.
+    """
+    ball = game_state.get("ball", {})
+    players = game_state.get("players", [])
+    if not holder_is_me(ball, players, team_id, my_player_id):
+        return None
+    if position_label == "GK":
+        cmd = commands[0] if commands else {}
+        params = cmd.get("parameters") or {}
+        if cmd.get("commandType") != "GK_DISTRIBUTE" or params.get("method") != "KICK":
+            return "goalkeeper clears long"
+        return None
+
+    options = {o["id"]: o for o in pass_options(game_state, team_id, my_player_id)}
+    under, _ = pressure(game_state, team_id, my_player_id)
+    in_range = in_shooting_range(game_state, team_id, my_player_id)
+
+    for cmd in commands:
+        ctype = cmd.get("commandType")
+        if ctype == "PASS":
+            option = options.get((cmd.get("parameters") or {}).get("target_player_id"))
+            if option and option["forbidden"]:
+                return "back pass in our defensive third"
+            if under and not (option and option["open"] and not option["blocked"]):
+                return "under pressure without an open pass, carry the ball"
+        elif under and not (ctype == "SHOOT" and in_range):
+            return "under pressure, carry the ball"
     return None
 
 

@@ -8,7 +8,8 @@ Cómo llenarla: ver [README de .docs](README.md).
 | Versión | Fecha | Cambio principal | Partidos | G-E-P | Goles a favor / en contra |
 |---|---|---|---|---|---|
 | [v0](#v0--código-original-de-aws) | 2026-10-28 | Código de ejemplo de AWS, sin cambios | 2 | 0-0-2 | 3 / 7 |
-| [v1](#v1--escala-del-campo-filtros-y-entrenador) | 2026-10-28 | Escala real del campo, filtros de comandos imposibles, instrucciones del entrenador | 0 | – | – |
+| [v1](#v1--escala-del-campo-filtros-y-entrenador) | 2026-10-28 | Escala real del campo, filtros de comandos imposibles, instrucciones del entrenador | 1 | 0-0-1 | 0 / 1 |
+| [v2](#v2--juego-de-posesión-triangulaciones-autopase-y-despeje-largo) | 2026-10-28 | Triangulaciones, sin pases atrás en zona propia, autopase con presión, despeje largo del portero | 0 | – | – |
 
 G-E-P = ganados, empatados, perdidos.
 
@@ -18,6 +19,7 @@ G-E-P = ganados, empatados, perdidos.
 |---|---|---|---|---|---|---|---|
 | 1 | 2026-10-28 | v0 | The Benchmark FC (equilibrado) | 1-3 | 41% | 4 (1) | [txt](partidos/2026-10-28-p1-benchmark-fc.txt) · [json](partidos/2026-10-28-p1-benchmark-fc.json) |
 | 2 | 2026-10-28 | v0 | Total Attack United (muy ofensivo) | 2-4 | 34% | 2 (2) | [txt](partidos/2026-10-28-p2-total-attack-united.txt) · [json](partidos/2026-10-28-p2-total-attack-united.json) |
+| 3 | 2026-10-28 | v1 | Fort Knox Athletic (muy defensivo) | 0-1 | 45% | 1 (0) | [txt](partidos/2026-10-28-p3-fort-knox-athletic.txt) · [json](partidos/2026-10-28-p3-fort-knox-athletic.json) |
 
 \* Según el Match Report del Player Portal. Ver la [nota sobre el reporte](#nota-el-match-report-invierte-las-columnas-de-comandos).
 
@@ -53,8 +55,8 @@ Lo operativo primero: sin una escala correcta, ninguna estrategia se puede evalu
 
 ## v1 — Escala del campo, filtros y entrenador
 
-**Commits:** `84f1289` y el commit de la bitácora, que suma el filtro de "no perseguir el balón propio".
-**Desplegado en AgentCore:** versión 3 de los runtimes, 2026-10-28.
+**Commits:** `84f1289` y `2579865`, que suma el filtro de "no perseguir el balón propio".
+**Desplegado en AgentCore:** versión 3 de los runtimes, 2026-10-28 18:21 UTC.
 
 ### Cambios
 
@@ -77,11 +79,66 @@ Lo operativo primero: sin una escala correcta, ninguna estrategia se puede evalu
 
 ### Resultados
 
-_Pendiente: jugar 2 o 3 partidos contra The Benchmark FC para comparar con v0._
+Un partido, el 3, perdido 0-1 contra Fort Knox Athletic (muy defensivo). No es comparable directo con v0: el rival es otro y es un solo partido.
+
+| Métrica | v0 (partidos 1 y 2) | v1 (partido 3) |
+|---|---|---|
+| Goles en contra | 3 y 4 | **1** |
+| Goles a favor | 1 y 2 | 0 |
+| Decisiones corregidas por el filtro | – | **52**: GK 19 sacar sin balón; DEF 22 presionar balón propio y 2 pasar sin balón; MID 4 y FWD2 4 presionar balón propio; FWD2 1 tirar sin balón |
+| GK pide sacar sin balón | 60 y 67 (~70% de sus turnos) | 19 (30%). Con el historial corto el modelo copia menos su respuesta anterior. |
+| Latencia p50 de GK / DEF / MID / FWD1 / FWD2 | 0.64 / 0.79 / 1.09 / 0.64 / 0.94 s | **0.48 / 0.58 / 0.69 / 0.53 / 0.65 s** |
+| Tiros pedidos por FWD1 / FWD2 | 4-5 / 19-29 (muchos sin balón) | 7 / 11 |
+| Mensajes del entrenador | ninguno | ninguno: no se probó |
+
+Lectura: lo operativo funciona. Los filtros actúan, la latencia bajó entre 25% y 37% y recibimos menos goles. Falta generar peligro: contra un rival encerrado atrás no hubo goles.
 
 ### Qué mejorar → v2
 
-_Llenar después de los partidos de v1._
+Pedidos del entrenador después del partido 3, más lo que muestran los datos de los 3 partidos:
+
+- **Triangular con el balón.** Los compañeros del que lleva el balón no se ubicaban para recibir.
+- **Sin pases atrás cerca de nuestra área.**
+- **Autopase con un rival cerca.** En el 58% de los turnos con balón (78 de 135) había un rival a menos de 1.2 unidades. Mover el balón casi no se usó: 10 veces, y 6 conservaron el balón al turno siguiente.
+- **Despeje largo del portero** cuando tiene el balón.
+
+---
+
+## v2 — Juego de posesión: triangulaciones, autopase y despeje largo
+
+**Desplegado en AgentCore:** versión 4 de los runtimes, 2026-10-28.
+**Ojo:** son 4 cambios juntos, por pedido del entrenador. Cada uno se mide por separado con las razones del filtro (`filtro <pos> {...}` en el reporte).
+
+### Cambios
+
+Todo está en `lib/tactics.py`. Lo activa `team_play=True` en los 5 agentes; los equipos de ejemplo de AWS no cambian.
+
+| Pedido | Qué hace el código | Qué ve el modelo |
+|---|---|---|
+| Triangulaciones | Con el balón en nuestro equipo, cada jugador sin balón tiene un `supportSpot`: FWD1 adelante a la izquierda del que lleva el balón, FWD2 adelante a la derecha, MID atrás en diagonal y DEF de seguridad sin pasar la mitad. Si el modelo pide presionar el balón propio, va a ese punto. | `TEAMMATE HAS THE BALL: your supportSpot=(x,y)` |
+| Sin pases atrás en zona propia | En nuestro tercio del campo, un pase hacia atrás (incluido al portero) se cambia por el mejor pase adelante, o por una conducción si no hay pase. | Opciones de pase marcadas `FORWARD`/`BACK`, `open`/`marked`, `BLOCKED` y `FORBIDDEN`, más `bestPass` |
+| Autopase con presión | Con un rival a menos de ~1.2 unidades, el jugador conduce hacia `dribbleTo`, el punto adelante más alejado de los rivales. Se mantiene la decisión del modelo si es un pase abierto o un tiro en rango. | `underPressure=True nearestOpponent=d` y `dribbleTo=(x,y)` |
+| Despeje largo | El portero con balón siempre hace `GK_DISTRIBUTE` con `KICK` al compañero más adelantado y libre. | `clear it long: ... KICK to player N` |
+
+Prueba local con el modelo real: MID con presión eligió un pase en profundidad abierto, FWD1 fue exacto a su `supportSpot`, DEF en su tercio pasó adelante y GK pateó largo.
+
+### Qué esperamos ver
+
+| Métrica | v1 | Esperado en v2 |
+|---|---|---|
+| Razón `back pass in our defensive third` | – | Pocas: el modelo ya ve `FORBIDDEN` |
+| Razones `under pressure...` | – | Algunas por partido. Revisar si al turno siguiente seguimos con el balón. |
+| Razón `goalkeeper clears long` | – | Cada vez que el GK atrape y el modelo no patee |
+| Goles a favor | 0 | Más, por triangulación y conducción hacia el arco |
+| Goles en contra | 1 | Igual o menos |
+
+### Resultados
+
+_Pendiente: partidos de calibración._
+
+### Qué mejorar → v3
+
+_Llenar después de los partidos de v2._
 
 ---
 

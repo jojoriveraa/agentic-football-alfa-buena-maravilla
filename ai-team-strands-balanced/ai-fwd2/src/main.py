@@ -8,6 +8,7 @@ from _bootstrap import setup_lib_path; setup_lib_path(__file__)
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from agent_base import create_agent, create_invoke_handler
+from tactics import TEAM_PLAY_RULES
 from fallback import build_fallback, FWD2_CONFIG
 
 app = BedrockAgentCoreApp()
@@ -58,6 +59,8 @@ TACTICAL:
 - Team 1 (AWAY) defends +x, attacks toward -x
 - PASS, SHOOT and GK_DISTRIBUTE only work when YOUR PLAYER shows hasBall=True.
 
+{TEAM_PLAY_RULES}
+
 ## Response
 Return ONLY a JSON array with exactly ONE command for player {MY_PLAYER_ID}.
 Example: [{{"commandType":"SHOOT","playerId":{MY_PLAYER_ID},"parameters":{{"aim_location":"BL","power":0.85}},"duration":0}}]
@@ -75,6 +78,7 @@ agent = create_agent(SYSTEM_PROMPT, model_id="us.amazon.nova-lite-v1:0")
 create_invoke_handler(
     app, agent, MY_PLAYER_ID, POSITION_LABEL, fallback_commands,
     fallback_cfg=FWD2_CONFIG, player_name=PLAYER_NAME,
+    team_play=True,
 )
 
 if __name__ == "__main__":

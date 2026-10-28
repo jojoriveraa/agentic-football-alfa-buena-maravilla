@@ -72,6 +72,7 @@ def read_stream(logs, group, stream):
 
 def app_summary(records):
     n, cmds, lat, started, chats = Counter(), Counter(), [], {}, []
+    reasons = Counter()
     for ts, r in records:
         m, req = r.get("message", ""), r.get("requestId")
         if "agent invoked" in m:
@@ -83,6 +84,7 @@ def app_summary(records):
             n["respaldo_por_parseo"] += 1
         elif "overriding model" in m:
             n["filtro_corrigio"] += 1
+            reasons[m.split("overriding model (", 1)[-1].split(")", 1)[0]] += 1
         elif "target fitted to pitch" in m:
             n["movimiento_ajustado"] += 1
         elif "recovered malformed JSON" in m:
@@ -93,7 +95,7 @@ def app_summary(records):
             chats.append((ts, m.split("teamChat changed: ", 1)[-1]))
         if req in started and (m.startswith("LLM returned") or m.startswith("Fallback returned")):
             lat.append((ts - started.pop(req)) / 1000)
-    return n, lat, chats
+    return n, lat, chats, reasons
 
 
 def model_ticks(logs, group, start_ms, end_ms):
@@ -167,7 +169,7 @@ def main():
         records = list(read_stream(logs, group, stream))
         if not records:
             continue
-        n, lat, chats = app_summary(records)
+        n, lat, chats, reasons = app_summary(records)
         start_ms, end_ms = records[0][0] - 5000, records[-1][0] + 5000
         ticks = model_ticks(logs, group, start_ms, end_ms)
         cmds = Counter(t["command"] for t in ticks)
@@ -187,6 +189,7 @@ def main():
             "pide_pase_tiro_saque_sin_balon": no_ball,
             "persigue_balon_propio": press_own,
             "mensajes_entrenador": [c for _, c in chats],
+            "razones_del_filtro": dict(reasons.most_common()),
         }
 
     first = next(iter(report.values()), None)
@@ -199,6 +202,10 @@ def main():
               f"{r.get('movimiento_ajustado',0):6} {r.get('respaldo_por_parseo',0):4} {r.get('errores',0):3} "
               f"{r['latencia_p50_s'] or 0:5.2f} {r['con_balon']:8} {r['pide_pase_tiro_saque_sin_balon']:8} "
               f"{r['persigue_balon_propio']:7}  {r['comandos_del_modelo']}")
+
+    for pos, r in report.items():
+        if r["razones_del_filtro"]:
+            print(f"  filtro {pos.upper():5} {r['razones_del_filtro']}")
 
     if all_positions:
         xs = [p[0] for p in all_positions]

@@ -8,6 +8,7 @@ from _bootstrap import setup_lib_path; setup_lib_path(__file__)
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from agent_base import create_agent, create_invoke_handler
+from tactics import TEAM_PLAY_RULES
 from fallback import build_fallback, GK_CONFIG
 
 app = BedrockAgentCoreApp()
@@ -30,7 +31,7 @@ SYSTEM_PROMPT = f"""You are an AI soccer goalkeeper controlling ONLY player {MY_
 - Conserve stamina — avoid sprinting unless absolutely necessary
 
 ## Priority
-1. If hasBall=True → GK_DISTRIBUTE (THROW to nearest teammate)
+1. If hasBall=True → GK_DISTRIBUTE with method KICK to the most advanced teammate (long clearance)
 2. If ball is loose near your box → INTERCEPT
 3. Otherwise → MOVE_TO to stay between ball and goal center
 
@@ -60,6 +61,8 @@ TACTICAL:
 - Team 1 (AWAY) defends +x, attacks toward -x
 - PASS, SHOOT and GK_DISTRIBUTE only work when YOUR PLAYER shows hasBall=True.
 
+{TEAM_PLAY_RULES}
+
 ## Response
 Return ONLY a JSON array with exactly ONE command for player {MY_PLAYER_ID}.
 Example: [{{"commandType":"GK_DISTRIBUTE","playerId":{MY_PLAYER_ID},"parameters":{{"target_player_id":1,"method":"THROW"}},"duration":0}}]
@@ -77,6 +80,7 @@ agent = create_agent(SYSTEM_PROMPT, model_id="us.amazon.nova-micro-v1:0")
 create_invoke_handler(
     app, agent, MY_PLAYER_ID, POSITION_LABEL, fallback_commands,
     fallback_cfg=GK_CONFIG, player_name=PLAYER_NAME,
+    team_play=True,
 )
 
 if __name__ == "__main__":
