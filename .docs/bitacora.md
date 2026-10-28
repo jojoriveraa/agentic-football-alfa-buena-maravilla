@@ -21,7 +21,7 @@ G-E-P = ganados, empatados, perdidos.
 | 1 | 2026-10-28 | v0 | The Benchmark FC (equilibrado) | 1-3 | 41% | 4 (1) | [txt](partidos/2026-10-28-p1-benchmark-fc.txt) · [json](partidos/2026-10-28-p1-benchmark-fc.json) |
 | 2 | 2026-10-28 | v0 | Total Attack United (muy ofensivo) | 2-4 | 34% | 2 (2) | [txt](partidos/2026-10-28-p2-total-attack-united.txt) · [json](partidos/2026-10-28-p2-total-attack-united.json) |
 | 3 | 2026-10-28 | v1 | Fort Knox Athletic (muy defensivo) | 0-1 | 45% | 1 (0) | [txt](partidos/2026-10-28-p3-fort-knox-athletic.txt) · [json](partidos/2026-10-28-p3-fort-knox-athletic.json) |
-| 4 | 2026-10-28 | v2 | _por confirmar_ | 0-1 (gol a los 182 s) | – | – | [txt](partidos/2026-10-28-p4-rival-por-confirmar.txt) · [json](partidos/2026-10-28-p4-rival-por-confirmar.json) |
+| 4 | 2026-10-28 | v2 | The Benchmark FC (equilibrado) | 0-1 (gol a los 182 s) | – | – | [txt](partidos/2026-10-28-p4-benchmark-fc.txt) · [json](partidos/2026-10-28-p4-benchmark-fc.json) |
 
 \* Según el Match Report del Player Portal. Ver la [nota sobre el reporte](#nota-el-match-report-invierte-las-columnas-de-comandos).
 
@@ -136,7 +136,7 @@ Prueba local con el modelo real: MID con presión eligió un pase en profundidad
 
 ### Resultados
 
-Un partido, el 4: derrota 0-1, con el gol en contra recién a los 182 s. Aguantamos 3 minutos sin recibir.
+Un partido, el 4, contra The Benchmark FC: derrota 0-1, con el gol en contra recién a los 182 s. Contra el mismo rival, v0 perdió 1-3 y recibió el primer gol a los 39 s. Recibimos menos goles, pero seguimos sin generar.
 
 | Métrica | v1 (partido 3) | v2 (partido 4) |
 |---|---|---|
