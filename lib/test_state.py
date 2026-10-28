@@ -9,7 +9,7 @@ possession by index alone makes two players believe they hold the same ball.
 
 import copy
 
-from state import get_possession_info, holder_is_me, summarize_state
+from state import get_goal_positions, get_possession_info, holder_is_me, pitch_scale, summarize_state
 from test_helpers import GAME_STATE
 
 HOME, AWAY = 0, 1
@@ -99,6 +99,85 @@ def test_team_code_case_is_tolerated():
         assert ">>> YOUR PLAYER" in out, f"own player missing with {transform.__name__} teamCode"
         assert "hasBall=False" in out
     print("=== TEAMCODE: upper/title case tolerated ===")
+
+
+def test_no_coach_section_without_messages():
+    """An empty or missing teamChat must leave the prompt unchanged."""
+    gs = copy.deepcopy(GAME_STATE)
+    assert "COACH" not in summarize_state(gs, HOME, 0, "GK")
+    gs.pop("teamChat")
+    assert "COACH" not in summarize_state(gs, HOME, 0, "GK")
+    gs["teamChat"] = ["", {"other": 1}, None]
+    assert "COACH" not in summarize_state(gs, HOME, 0, "GK")
+    print("=== COACH: no section when there is nothing to say ===")
+
+
+def test_coach_messages_reach_the_prompt():
+    """Plain strings and dicts both render, newest last, capped."""
+    gs = copy.deepcopy(GAME_STATE)
+    gs["teamChat"] = ["old 1", "old 2", {"message": "press higher"}, {"text": "Arango, shoot now!"}]
+    out = summarize_state(gs, HOME, 3, "FWD1", "Arango")
+    assert 'YOUR PLAYER (FWD1 "Arango", id=3)' in out, out
+    assert 'you are "Arango" (FWD1)' in out
+    assert '"Arango, shoot now!"' in out and '"press higher"' in out
+    assert "old 1" not in out, "only the newest COACH_MESSAGES_SHOWN messages are shown"
+    assert out.rstrip().endswith("Still return ONLY the JSON array.")
+    print("=== COACH: messages rendered, newest last ===")
+
+
+def test_opponent_coach_is_labelled():
+    """When the sender team is known, the other coach is flagged as ignorable."""
+    gs = copy.deepcopy(GAME_STATE)
+    gs["teamChat"] = [
+        {"message": "hold the line", "teamCode": "HOME"},
+        {"message": "everyone stop", "teamId": 1},
+    ]
+    home = summarize_state(gs, HOME, 1, "DEF")
+    assert '[your coach] "hold the line"' in home
+    assert '[OPPONENT coach, ignore] "everyone stop"' in home
+    away = summarize_state(gs, AWAY, 1, "DEF")
+    assert '[OPPONENT coach, ignore] "hold the line"' in away
+    assert '[your coach] "everyone stop"' in away
+    print("=== COACH: opponent messages flagged per team ===")
+
+
+def scaled_state(factor: float) -> dict:
+    """GAME_STATE with every position shrunk, like the live small pitch."""
+    gs = copy.deepcopy(GAME_STATE)
+    for p in gs["players"]:
+        p["position"] = {k: v * factor for k, v in p["position"].items()}
+    gs["ball"]["position"] = {k: v * factor for k, v in gs["ball"]["position"].items()}
+    return gs
+
+
+def test_reference_pitch_is_unchanged():
+    """Keepers at ±50 mean the 110 x 70 pitch the prompts were written for."""
+    assert pitch_scale(GAME_STATE) == 1.0
+    assert get_goal_positions(HOME, 1.0) == (-55.0, 55.0)
+    out = summarize_state(GAME_STATE, HOME, 3, "FWD1")
+    assert "Pitch: x from -55.0 to 55.0, y from -35.0 to 35.0" in out, out
+    assert "Your goal at x=-55.0 | Opponent goal at x=55.0" in out
+    assert "shootRange=25.0" in out
+    print("=== PITCH: reference pitch detected and rendered as before ===")
+
+
+def test_small_pitch_is_detected():
+    """The live server's pitch (~10x smaller) must rescale goals and ranges."""
+    gs = scaled_state(0.12)
+    scale = pitch_scale(gs)
+    assert abs(scale - 0.12) < 1e-9, scale
+    out = summarize_state(gs, AWAY, 3, "FWD1")
+    assert "Pitch: x from -6.6 to 6.6, y from -4.2 to 4.2" in out, out
+    assert "Your goal at x=6.6 | Opponent goal at x=-6.6" in out
+    assert "shootRange=3.0" in out
+    print("=== PITCH: small pitch detected, goals at ±6.6, shootRange 3.0 ===")
+
+
+def test_missing_keepers_assume_reference():
+    gs = copy.deepcopy(GAME_STATE)
+    gs["players"] = [p for p in gs["players"] if p["agentId"] != "agentId_0"]
+    assert pitch_scale(gs) == 1.0
+    print("=== PITCH: no keepers, reference assumed ===")
 
 
 if __name__ == "__main__":

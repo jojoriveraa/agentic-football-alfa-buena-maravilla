@@ -10,6 +10,7 @@ from typing import Callable
 
 from state import (
     get_goal_positions,
+    pitch_scale,
     get_possession_info,
     holder_is_me,
     dist,
@@ -21,7 +22,11 @@ from state import (
 
 @dataclass
 class FallbackConfig:
-    """Per-position fallback behaviour."""
+    """Per-position fallback behaviour.
+
+    Distances and y offsets are in reference-pitch units (x ±55, y ±35) and
+    are scaled at runtime to the pitch the server is actually using.
+    """
 
     # What to do when we have the ball
     possession_action: str = "PASS"
@@ -153,7 +158,8 @@ def build_fallback(cfg: FallbackConfig) -> Callable[[dict, int, int], list[dict]
         ball_pos = ball.get("position", {"x": 0, "y": 0})
         players = game_state.get("players", [])
         possession_id = _possession_idx(ball)
-        my_goal_x, opp_goal_x = get_goal_positions(team_id)
+        scale = pitch_scale(game_state)
+        my_goal_x, opp_goal_x = get_goal_positions(team_id, scale)
 
         me = next(
             (p for p in players if _player_idx(p) == my_player_id and _is_my_team(p, team_id)),
@@ -166,14 +172,14 @@ def build_fallback(cfg: FallbackConfig) -> Callable[[dict, int, int], list[dict]
 
         # --- We have the ball ---
         if holder_is_me(ball, players, team_id, my_player_id):
-            return _on_ball(cfg, game_state, players, team_id, my_player_id, pos, my_goal_x, opp_goal_x)
+            return _on_ball(cfg, game_state, players, team_id, my_player_id, pos, my_goal_x, opp_goal_x, scale)
 
         # --- DEF: mark dangerous opponent ---
         if cfg.mark_threshold > 0:
             opponents = [p for p in players if not _is_my_team(p, team_id)]
             if opponents:
                 dangerous = min(opponents, key=lambda p: abs(p.get("position", {}).get("x", 0) - my_goal_x))
-                if abs(dangerous.get("position", {}).get("x", 0) - my_goal_x) < cfg.mark_threshold:
+                if abs(dangerous.get("position", {}).get("x", 0) - my_goal_x) < cfg.mark_threshold * scale:
                     return [_cmd("MARK", my_player_id, team_id,
                                  {"target_player_id": _player_idx(dangerous),
                                   "tightness": cfg.mark_tightness}, duration=3)]
@@ -184,16 +190,16 @@ def build_fallback(cfg: FallbackConfig) -> Callable[[dict, int, int], list[dict]
             if we_have_ball:
                 return [_cmd("MOVE_TO", my_player_id, team_id,
                              {"target_x": opp_goal_x * cfg.support_x_factor,
-                              "target_y": cfg.support_y, "sprint": cfg.support_sprint})]
+                              "target_y": cfg.support_y * scale, "sprint": cfg.support_sprint})]
 
         # --- Press if close to ball and opponent has it ---
         _, _, we_have_ball = get_possession_info(ball, players, team_id)
-        if not we_have_ball and dist(pos, ball_pos) < cfg.press_distance:
+        if not we_have_ball and dist(pos, ball_pos) < cfg.press_distance * scale:
             return [_cmd("PRESS_BALL", my_player_id, team_id,
                          {"intensity": cfg.press_intensity}, duration=cfg.press_duration)]
 
         # --- Default position ---
-        tx, ty = _default_pos(cfg, my_goal_x, opp_goal_x, ball_pos)
+        tx, ty = _default_pos(cfg, my_goal_x, opp_goal_x, ball_pos, scale)
         return [_cmd("MOVE_TO", my_player_id, team_id,
                       {"target_x": tx, "target_y": ty, "sprint": False})]
 
@@ -209,7 +215,7 @@ def _cmd(cmd_type: str, pid: int, tid: int, params: dict, duration: int = 0) -> 
             "parameters": params, "duration": duration}
 
 
-def _on_ball(cfg, game_state, players, team_id, my_player_id, pos, my_goal_x, opp_goal_x):
+def _on_ball(cfg, game_state, players, team_id, my_player_id, pos, my_goal_x, opp_goal_x, scale=1.0):
     """Handle possession for all position types."""
     if cfg.possession_action == "GK_DISTRIBUTE":
         teammates = [p for p in players if _is_my_team(p, team_id) and _player_idx(p) != my_player_id]
@@ -231,7 +237,7 @@ def _on_ball(cfg, game_state, players, team_id, my_player_id, pos, my_goal_x, op
                      {"target_player_id": 2, "type": "GROUND"})]
 
     if cfg.possession_action == "SHOOT_OR_PASS":
-        if abs(pos.get("x", 0) - opp_goal_x) < cfg.shoot_threshold:
+        if abs(pos.get("x", 0) - opp_goal_x) < cfg.shoot_threshold * scale:
             return [_cmd("SHOOT", my_player_id, team_id,
                          {"aim_location": cfg.shoot_aim, "power": cfg.shoot_power})]
         forwards = [p for p in players if _is_my_team(p, team_id) and _player_idx(p) in (3, 4)]
@@ -243,18 +249,18 @@ def _on_ball(cfg, game_state, players, team_id, my_player_id, pos, my_goal_x, op
                      {"target_player_id": 3, "type": "GROUND"})]
 
     if cfg.possession_action == "SHOOT_OR_ADVANCE":
-        if abs(pos.get("x", 0) - opp_goal_x) < cfg.shoot_threshold:
+        if abs(pos.get("x", 0) - opp_goal_x) < cfg.shoot_threshold * scale:
             return [_cmd("SHOOT", my_player_id, team_id,
                          {"aim_location": cfg.shoot_aim, "power": cfg.shoot_power})]
         return [_cmd("MOVE_TO", my_player_id, team_id,
                      {"target_x": opp_goal_x * cfg.advance_x_factor,
-                      "target_y": cfg.advance_y, "sprint": cfg.advance_sprint})]
+                      "target_y": cfg.advance_y * scale, "sprint": cfg.advance_sprint})]
 
     # Shouldn't reach here
     return [_cmd("SET_STANCE", my_player_id, team_id, {"stance": 0})]
 
 
-def _default_pos(cfg, my_goal_x, opp_goal_x, ball_pos):
+def _default_pos(cfg, my_goal_x, opp_goal_x, ball_pos, scale=1.0):
     """Calculate default x,y from config."""
     if cfg.default_x_ref == "my_goal":
         tx = my_goal_x * cfg.default_x_factor
@@ -266,10 +272,10 @@ def _default_pos(cfg, my_goal_x, opp_goal_x, ball_pos):
         tx = 0
 
     if cfg.default_y == "track_ball":
-        ty = max(-10, min(10, ball_pos.get("y", 0) * 0.5))
+        ty = max(-10 * scale, min(10 * scale, ball_pos.get("y", 0) * 0.5))
     elif cfg.default_y == "track_ball_30":
         ty = ball_pos.get("y", 0) * 0.3
     else:
-        ty = cfg.default_y
+        ty = cfg.default_y * scale
 
     return tx, ty

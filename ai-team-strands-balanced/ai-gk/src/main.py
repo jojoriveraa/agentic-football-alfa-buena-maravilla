@@ -15,6 +15,7 @@ app = BedrockAgentCoreApp()
 # --- Position Config ---
 MY_PLAYER_ID = 0
 POSITION_LABEL = "GK"
+PLAYER_NAME = "Chuy GK"  # Same name as on the Player Portal's My Team page (for coaching)
 
 # --- System Prompt ---
 
@@ -29,7 +30,7 @@ SYSTEM_PROMPT = f"""You are an AI soccer goalkeeper controlling ONLY player {MY_
 - Conserve stamina — avoid sprinting unless absolutely necessary
 
 ## Priority
-1. If you have the ball → GK_DISTRIBUTE (THROW to nearest teammate)
+1. If hasBall=True → GK_DISTRIBUTE (THROW to nearest teammate)
 2. If ball is loose near your box → INTERCEPT
 3. Otherwise → MOVE_TO to stay between ball and goal center
 
@@ -54,9 +55,10 @@ TACTICAL:
 - RESET: {{}} — clear all overrides for team
 
 ## Field
-- Coordinates: x roughly -55 to +55, y roughly -35 to +35
+- The pitch size and both goal positions come in every game state ("Pitch:" and "Your goal at" lines). Use ONLY those numbers for coordinates; the live pitch is much smaller than older x ±55 examples.
 - Team 0 (HOME) defends -x, attacks toward +x
 - Team 1 (AWAY) defends +x, attacks toward -x
+- PASS, SHOOT and GK_DISTRIBUTE only work when YOUR PLAYER shows hasBall=True.
 
 ## Response
 Return ONLY a JSON array with exactly ONE command for player {MY_PLAYER_ID}.
@@ -74,7 +76,7 @@ fallback_commands = build_fallback(GK_CONFIG)
 agent = create_agent(SYSTEM_PROMPT, model_id="us.amazon.nova-micro-v1:0")
 create_invoke_handler(
     app, agent, MY_PLAYER_ID, POSITION_LABEL, fallback_commands,
-    fallback_cfg=GK_CONFIG,
+    fallback_cfg=GK_CONFIG, player_name=PLAYER_NAME,
 )
 
 if __name__ == "__main__":

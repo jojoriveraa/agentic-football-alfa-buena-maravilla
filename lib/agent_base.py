@@ -3,17 +3,34 @@
 import json
 from typing import Callable
 from strands import Agent
+from strands.agent.conversation_manager import SlidingWindowConversationManager
 from strands.models import BedrockModel
 
 from parsing import parse_commands
 from state import summarize_state
 from fallback import FallbackConfig, build_last_resort
+from guards import fit_to_pitch, needs_fallback
 
 
-def create_agent(system_prompt: str, model_id: str = "us.amazon.nova-micro-v1:0") -> Agent:
-    """Create a Strands Agent with the given system prompt."""
+def create_agent(
+    system_prompt: str,
+    model_id: str = "us.amazon.nova-micro-v1:0",
+    history_messages: int = 2,
+) -> Agent:
+    """Create a Strands Agent with the given system prompt.
+
+    history_messages bounds how much of the match the model re-reads each
+    tick. The Strands default (40 messages) resent ~20 stale game states per
+    call, which cost latency and made the model copy its own earlier answers:
+    the goalkeeper repeated GK_DISTRIBUTE tick after tick without the ball.
+    Coach messages do not depend on history; they arrive in every state.
+    """
     model = BedrockModel(model_id=model_id)
-    return Agent(model=model, system_prompt=system_prompt)
+    return Agent(
+        model=model,
+        system_prompt=system_prompt,
+        conversation_manager=SlidingWindowConversationManager(window_size=history_messages),
+    )
 
 
 def parse_prompt(payload) -> dict:
@@ -59,6 +76,7 @@ def create_invoke_handler(
     position_label: str,
     fallback_fn: Callable[[dict, int, int], list[dict]],
     fallback_cfg: FallbackConfig,
+    player_name: str | None = None,
 ):
     """Create and register the @app.entrypoint invoke handler.
 
@@ -66,9 +84,15 @@ def create_invoke_handler(
       1. LLM response → parse into commands
       2. fallback_fn(game_state, team_id, my_player_id) → rule-based commands
       3. last-resort command from fallback_cfg → single safe command
+
+    player_name should match the name set for this player on the Player
+    Portal's My Team page, so coach messages addressed by name reach it.
     """
     log = app.logger
     last_resort = build_last_resort(fallback_cfg, my_player_id)
+    # teamChat's entry schema is undocumented: log the raw array whenever it
+    # changes, so the first match with coaching shows its real shape.
+    last_chat = {"raw": None}
 
     @app.entrypoint
     async def invoke(payload, context):
@@ -83,8 +107,15 @@ def create_invoke_handler(
             my_players = prompt_data.get("myPlayers", [my_player_id])
             effective_pid = my_players[0] if my_players else my_player_id
 
+            team_chat = game_state.get("teamChat")
+            if team_chat:
+                raw_chat = json.dumps(team_chat, default=str)
+                if raw_chat != last_chat["raw"]:
+                    last_chat["raw"] = raw_chat
+                    log.info(f"{position_label} teamChat changed: {raw_chat[:1000]}")
+
             state_summary = summarize_state(
-                game_state, team_id, effective_pid, position_label
+                game_state, team_id, effective_pid, position_label, player_name
             )
             log.info(f"{position_label} agent invoked for team {team_id}, controlling player {effective_pid}")
 
@@ -102,12 +133,18 @@ def create_invoke_handler(
             if commands:
                 log.info(f"LLM returned {len(commands)} commands: "
                          f"{[c.get('commandType') for c in commands]}")
-                yield json.dumps(commands)
+                reason = needs_fallback(commands, game_state, team_id, effective_pid)
+                if reason:
+                    log.warn(f"{position_label} overriding model ({reason}), using fallback")
+                    commands = fallback_fn(game_state, team_id, effective_pid)
             else:
                 log.warn(f"LLM parse failed, using fallback. Response: {response_text[:200]}")
                 commands = fallback_fn(game_state, team_id, effective_pid)
                 log.info(f"Fallback returned {len(commands)} commands")
-                yield json.dumps(commands)
+
+            for note in fit_to_pitch(commands, game_state):
+                log.info(f"{position_label} target fitted to pitch: {note}")
+            yield json.dumps(commands)
 
         except Exception as e:
             log.error(f"{position_label} agent error: {e}")

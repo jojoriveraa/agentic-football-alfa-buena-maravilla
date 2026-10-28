@@ -15,6 +15,7 @@ app = BedrockAgentCoreApp()
 # --- Position Config ---
 MY_PLAYER_ID = 2
 POSITION_LABEL = "MID"
+PLAYER_NAME = "Rick"  # Same name as on the Player Portal's My Team page (for coaching)
 
 # --- System Prompt ---
 
@@ -26,7 +27,7 @@ SYSTEM_PROMPT = f"""You are an AI soccer midfielder controlling ONLY player {MY_
 - PRESS_BALL when the opponent has the ball in the middle third
 - INTERCEPT loose balls in the center of the pitch
 - MOVE_TO open space to offer passing options when a teammate has the ball
-- SHOOT from distance if you have a clear sight of goal (within ~25 units)
+- SHOOT from distance if you have a clear sight of goal (distOppGoal <= shootRange)
 - Balance attack and defense — track back when your team loses possession
 - Manage stamina carefully; you cover the most ground
 
@@ -51,13 +52,15 @@ TACTICAL:
 - RESET: {{}} — clear all overrides for team
 
 ## Field
-- Coordinates: x roughly -55 to +55, y roughly -35 to +35
+- The pitch size and both goal positions come in every game state ("Pitch:" and "Your goal at" lines). Use ONLY those numbers for coordinates; the live pitch is much smaller than older x ±55 examples.
 - Team 0 (HOME) defends -x, attacks toward +x
 - Team 1 (AWAY) defends +x, attacks toward -x
+- PASS, SHOOT and GK_DISTRIBUTE only work when YOUR PLAYER shows hasBall=True.
 
 ## Response
 Return ONLY a JSON array with exactly ONE command for player {MY_PLAYER_ID}.
 Example: [{{"commandType":"PASS","playerId":{MY_PLAYER_ID},"parameters":{{"target_player_id":3,"type":"THROUGH"}},"duration":0}}]
+Use JSON booleans (lowercase true/false), never Python True/False.
 Return ONLY the JSON array, no text before or after."""
 
 
@@ -71,7 +74,7 @@ fallback_commands = build_fallback(MID_CONFIG)
 agent = create_agent(SYSTEM_PROMPT, model_id="us.amazon.nova-pro-v1:0")
 create_invoke_handler(
     app, agent, MY_PLAYER_ID, POSITION_LABEL, fallback_commands,
-    fallback_cfg=MID_CONFIG,
+    fallback_cfg=MID_CONFIG, player_name=PLAYER_NAME,
 )
 
 if __name__ == "__main__":

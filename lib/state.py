@@ -90,11 +90,56 @@ def _possession_idx(ball: dict):
     return ball.get("possessionPlayerId")
 
 
-def get_goal_positions(team_id: int) -> tuple[float, float]:
-    """Return (my_goal_x, opp_goal_x) based on team."""
+# ---------------------------------------------------------------------------
+# Pitch geometry
+#
+# Prompts and fallback configs are written for a 110 x 70 reference pitch
+# (x ±55, y ±35), which is also what the workshop docs describe. The live
+# server has been observed sending a pitch about 10x smaller: goalkeepers
+# near x=±6 and the ball never beyond ±6.5. Every distance the model sees,
+# the goal positions and the fallback thresholds were therefore off by an
+# order of magnitude. The scale is estimated per tick so either pitch works.
+# ---------------------------------------------------------------------------
+
+REFERENCE_HALF_LENGTH = 55.0
+REFERENCE_HALF_WIDTH = 35.0
+_REFERENCE_GK_X = 50.0
+"""Where a goalkeeper stands on the reference pitch (0.9 of the half-length)."""
+SHOOT_RANGE = 25.0
+"""Shooting distance to goal on the reference pitch, as the prompts used it."""
+
+
+def pitch_scale(game_state: dict) -> float:
+    """Pitch size relative to the 110 x 70 reference pitch (1.0 = reference).
+
+    Estimated from the goalkeepers (index 0 on each team), the players most
+    reliably near their own goal line. The deeper of the two is used, since
+    one keeper rushing out must not shrink the pitch. Anything at or above
+    half the reference is treated as the reference pitch; no goalkeeper in
+    the state means no evidence, so the reference is assumed.
+    """
+    keepers = [
+        abs(p["position"]["x"])
+        for p in game_state.get("players", [])
+        if _player_idx(p) == 0 and isinstance(p.get("position", {}).get("x"), (int, float))
+    ]
+    if not keepers:
+        return 1.0
+    scale = max(keepers) / _REFERENCE_GK_X
+    return 1.0 if scale >= 0.5 else max(scale, 0.05)
+
+
+def pitch_bounds(scale: float = 1.0) -> tuple[float, float]:
+    """(half_length, half_width) of the pitch at this scale."""
+    return REFERENCE_HALF_LENGTH * scale, REFERENCE_HALF_WIDTH * scale
+
+
+def get_goal_positions(team_id: int, scale: float = 1.0) -> tuple[float, float]:
+    """Return (my_goal_x, opp_goal_x) based on team and pitch scale."""
+    half_length = REFERENCE_HALF_LENGTH * scale
     if team_id == 0:
-        return -55.0, 55.0
-    return 55.0, -55.0
+        return -half_length, half_length
+    return half_length, -half_length
 
 
 def get_possession_info(ball: dict, players: list, team_id: int) -> tuple:
@@ -145,11 +190,87 @@ def dist(pos1: dict, pos2: dict) -> float:
     )
 
 
+# ---------------------------------------------------------------------------
+# Coach instructions (teamChat)
+#
+# The Player Portal delivers coach messages in gameState.teamChat, and an
+# agent only reacts to them if its prompt includes them. The entry schema is
+# not documented, so these helpers accept plain strings as well as dicts with
+# any of the common text/sender keys, and agent_base logs the raw array the
+# first time it changes so the real shape shows up in CloudWatch.
+# ---------------------------------------------------------------------------
+
+COACH_MESSAGES_SHOWN = 3
+"""Most recent coach messages included in the prompt (newest last)."""
+
+_CHAT_TEXT_KEYS = ("message", "text", "content", "instruction", "msg")
+_CHAT_TEAM_KEYS = ("teamCode", "team", "teamId", "senderTeam", "fromTeam")
+
+
+def _chat_text(entry) -> str:
+    """Message text from a teamChat entry, whatever its shape."""
+    if isinstance(entry, str):
+        return entry.strip()
+    if isinstance(entry, dict):
+        for key in _CHAT_TEXT_KEYS:
+            value = entry.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return ""
+
+
+def _chat_is_mine(entry, team_id: int):
+    """True/False when the entry names the sender's team, None when it does not.
+
+    Every message is heard by all 10 players, so the opposing coach's
+    messages can reach this agent too. When the sender's team is known the
+    prompt labels it; when it is not, the model is told to judge from context.
+    """
+    if not isinstance(entry, dict):
+        return None
+    for key in _CHAT_TEAM_KEYS:
+        value = entry.get(key)
+        if isinstance(value, str):
+            return value.strip().lower() == ("home" if team_id == 0 else "away")
+        if isinstance(value, int) and not isinstance(value, bool):
+            return value == team_id
+    return None
+
+
+def format_team_chat(
+    team_chat,
+    team_id: int,
+    position_label: str,
+    player_name: str | None = None,
+) -> list[str]:
+    """Prompt lines for the latest coach messages, or [] when there are none."""
+    if not isinstance(team_chat, list):
+        return []
+    messages = [(e, _chat_text(e)) for e in team_chat]
+    messages = [(e, text) for e, text in messages if text][-COACH_MESSAGES_SHOWN:]
+    if not messages:
+        return []
+
+    who = f'"{player_name}" ({position_label})' if player_name else position_label
+    lines = [f"COACH INSTRUCTIONS (newest last) — you are {who}:"]
+    for entry, text in messages:
+        mine = _chat_is_mine(entry, team_id)
+        tag = "your coach" if mine is True else "OPPONENT coach, ignore" if mine is False else "coach"
+        lines.append(f'  [{tag}] "{text}"')
+    lines.append(
+        "Follow your coach's newest instruction if it is addressed to you by name, "
+        "by your position, or to the whole team. Ignore instructions meant for other "
+        "players. Still return ONLY the JSON array."
+    )
+    return lines
+
+
 def summarize_state(
     game_state: dict,
     team_id: int,
     my_player_id: int,
     position_label: str,
+    player_name: str | None = None,
 ) -> str:
     """Build a concise text summary of the game state for a single-player agent."""
     ball = game_state.get("ball", {})
@@ -171,13 +292,16 @@ def summarize_state(
     me = next((p for p in my_team if _player_idx(p) == my_player_id), None)
     possession_id, ball_status, _ = get_possession_info(ball, players, team_id)
 
-    my_goal_x, opp_goal_x = get_goal_positions(team_id)
+    scale = pitch_scale(game_state)
+    half_length, half_width = pitch_bounds(scale)
+    my_goal_x, opp_goal_x = get_goal_positions(team_id, scale)
 
     lines = [
         f"Time: {game_time:.0f}s | Score: {score.get('home',0)}-{score.get('away',0)} | "
         f"Team: {team_id} ({'HOME' if team_id == 0 else 'AWAY'}) | PlayMode: {play_mode}",
+        f"Pitch: x from {-half_length:.1f} to {half_length:.1f}, y from {-half_width:.1f} to {half_width:.1f}",
         f"Ball: ({ball_pos.get('x',0):.1f}, {ball_pos.get('y',0):.1f}) held by {ball_status}",
-        f"Your goal at x={my_goal_x:.0f} | Opponent goal at x={opp_goal_x:.0f}",
+        f"Your goal at x={my_goal_x:.1f} | Opponent goal at x={opp_goal_x:.1f}",
         "",
     ]
 
@@ -191,9 +315,15 @@ def summarize_state(
         stam = me.get("stamina", 1.0)
         dist_ball = dist(pos, ball_pos)
         has_ball = holder_is_me(ball, players, team_id, my_player_id)
-        extra = f" distOppGoal={abs(pos.get('x', 0) - opp_goal_x):.1f}" if position_label in ("MID", "FWD1", "FWD2") else ""
+        # shootRange keeps the prompts' original "~25 units on the reference
+        # pitch" rule, expressed on the pitch actually being played.
+        extra = (
+            f" distOppGoal={abs(pos.get('x', 0) - opp_goal_x):.1f} shootRange={SHOOT_RANGE * scale:.1f}"
+            if position_label in ("MID", "FWD1", "FWD2") else ""
+        )
+        name = f' "{player_name}"' if player_name else ""
         lines.append(
-            f">>> YOUR PLAYER ({position_label}, id={my_player_id}): "
+            f">>> YOUR PLAYER ({position_label}{name}, id={my_player_id}): "
             f"pos=({pos.get('x',0):.1f},{pos.get('y',0):.1f}) "
             # :.0f rounded the 0.0-1.0 fraction to a single digit, so the
             # model only ever saw 0 or 1 — fully rested or exhausted, with
@@ -226,5 +356,12 @@ def summarize_state(
         d_goal = abs(pos.get("x", 0) - my_goal_x)
         d_me = dist(pos, me.get("position", {})) if me else 0
         lines.append(f"  P{pid}: ({pos.get('x',0):.1f},{pos.get('y',0):.1f}) distToMyGoal={d_goal:.1f} distToMe={d_me:.1f}")
+
+    coach_lines = format_team_chat(
+        game_state.get("teamChat"), team_id, position_label, player_name
+    )
+    if coach_lines:
+        lines.append("")
+        lines.extend(coach_lines)
 
     return "\n".join(lines)

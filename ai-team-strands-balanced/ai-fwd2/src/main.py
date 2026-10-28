@@ -15,6 +15,7 @@ app = BedrockAgentCoreApp()
 # --- Position Config ---
 MY_PLAYER_ID = 4
 POSITION_LABEL = "FWD2"
+PLAYER_NAME = ""  # Same name as on the Player Portal's My Team page (for coaching)
 
 # --- System Prompt ---
 
@@ -22,7 +23,7 @@ SYSTEM_PROMPT = f"""You are an AI soccer forward controlling ONLY player {MY_PLA
 
 ## Your Role — Forward 2 (Right/Secondary Striker)
 - Your main job is to SCORE GOALS — be aggressive and attack-minded
-- SHOOT whenever you have the ball within shooting range (~25 units from goal)
+- SHOOT whenever you have the ball within shooting range (distOppGoal <= shootRange)
 - Make runs toward the opponent's goal to get into scoring positions
 - MOVE_TO open space ahead of the ball to receive through passes
 - When a teammate has the ball, position yourself for a pass in the attacking third
@@ -52,9 +53,10 @@ TACTICAL:
 - RESET: {{}} — clear all overrides for team
 
 ## Field
-- Coordinates: x roughly -55 to +55, y roughly -35 to +35
+- The pitch size and both goal positions come in every game state ("Pitch:" and "Your goal at" lines). Use ONLY those numbers for coordinates; the live pitch is much smaller than older x ±55 examples.
 - Team 0 (HOME) defends -x, attacks toward +x
 - Team 1 (AWAY) defends +x, attacks toward -x
+- PASS, SHOOT and GK_DISTRIBUTE only work when YOUR PLAYER shows hasBall=True.
 
 ## Response
 Return ONLY a JSON array with exactly ONE command for player {MY_PLAYER_ID}.
@@ -72,7 +74,7 @@ fallback_commands = build_fallback(FWD2_CONFIG)
 agent = create_agent(SYSTEM_PROMPT, model_id="us.amazon.nova-lite-v1:0")
 create_invoke_handler(
     app, agent, MY_PLAYER_ID, POSITION_LABEL, fallback_commands,
-    fallback_cfg=FWD2_CONFIG,
+    fallback_cfg=FWD2_CONFIG, player_name=PLAYER_NAME,
 )
 
 if __name__ == "__main__":
