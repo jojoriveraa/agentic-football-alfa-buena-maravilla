@@ -1,0 +1,86 @@
+{
+  "gk": {
+    "session": "4ad94acd-7f63-41a0-ae2b-0028ba9d021c-team0-pos0",
+    "inicio_utc": "18:09:04",
+    "llamadas": 90,
+    "modelo_ok": 90,
+    "latencia_p50_s": 0.63,
+    "latencia_max_s": 0.82,
+    "comandos_del_modelo": {
+      "GK_DISTRIBUTE": 71,
+      "INTERCEPT": 17,
+      "MOVE_TO": 2
+    },
+    "con_balon": 4,
+    "pide_pase_tiro_saque_sin_balon": 67,
+    "persigue_balon_propio": 0,
+    "mensajes_entrenador": []
+  },
+  "def": {
+    "session": "4ad94acd-7f63-41a0-ae2b-0028ba9d021c-team0-pos1",
+    "inicio_utc": "18:09:02",
+    "llamadas": 86,
+    "modelo_ok": 86,
+    "latencia_p50_s": 0.93,
+    "latencia_max_s": 1.28,
+    "comandos_del_modelo": {
+      "PRESS_BALL": 54,
+      "INTERCEPT": 16,
+      "PASS": 15,
+      "MARK": 1
+    },
+    "con_balon": 13,
+    "pide_pase_tiro_saque_sin_balon": 2,
+    "persigue_balon_propio": 26,
+    "mensajes_entrenador": []
+  },
+  "mid": {
+    "session": "4ad94acd-7f63-41a0-ae2b-0028ba9d021c-team0-pos2",
+    "inicio_utc": "18:09:05",
+    "llamadas": 91,
+    "modelo_ok": 91,
+    "latencia_p50_s": 1.09,
+    "latencia_max_s": 1.86,
+    "comandos_del_modelo": {
+      "MOVE_TO": 68,
+      "PASS": 18,
+      "PRESS_BALL": 5
+    },
+    "con_balon": 11,
+    "pide_pase_tiro_saque_sin_balon": 7,
+    "persigue_balon_propio": 0,
+    "mensajes_entrenador": []
+  },
+  "fwd1": {
+    "session": "4ad94acd-7f63-41a0-ae2b-0028ba9d021c-team0-pos3",
+    "inicio_utc": "18:09:04",
+    "llamadas": 85,
+    "modelo_ok": 85,
+    "latencia_p50_s": 0.66,
+    "latencia_max_s": 1.09,
+    "comandos_del_modelo": {
+      "MOVE_TO": 80,
+      "SHOOT": 5
+    },
+    "con_balon": 5,
+    "pide_pase_tiro_saque_sin_balon": 0,
+    "persigue_balon_propio": 0,
+    "mensajes_entrenador": []
+  },
+  "fwd2": {
+    "session": "4ad94acd-7f63-41a0-ae2b-0028ba9d021c-team0-pos4",
+    "inicio_utc": "18:09:04",
+    "llamadas": 86,
+    "modelo_ok": 86,
+    "latencia_p50_s": 1.06,
+    "latencia_max_s": 2.45,
+    "comandos_del_modelo": {
+      "MOVE_TO": 57,
+      "SHOOT": 29
+    },
+    "con_balon": 8,
+    "pide_pase_tiro_saque_sin_balon": 22,
+    "persigue_balon_propio": 0,
+    "mensajes_entrenador": []
+  }
+}

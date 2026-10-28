@@ -1,0 +1,13 @@
+Partido: sesion 4ad94acd-7f63-41a0-ae2b-0028ba9d021c-team0-pos0  inicio 18:09:04 UTC
+
+pos   llam   ok filtro ajuste resp err   p50 conBalon sinBalon  propio  comandos del modelo
+GK      90   90      0      0    0   0  0.63        4       67       0  {'GK_DISTRIBUTE': 71, 'INTERCEPT': 17, 'MOVE_TO': 2}
+DEF     86   86      0      0    0   0  0.93       13        2      26  {'PRESS_BALL': 54, 'INTERCEPT': 16, 'PASS': 15, 'MARK': 1}
+MID     91   91      0      0    0   0  1.09       11        7       0  {'MOVE_TO': 68, 'PASS': 18, 'PRESS_BALL': 5}
+FWD1    85   85      0      0    0   0  0.66        5        0       0  {'MOVE_TO': 80, 'SHOOT': 5}
+FWD2    86   86      0      0    0   0  1.06        8       22       0  {'MOVE_TO': 57, 'SHOOT': 29}
+
+Campo observado: x [-7.0, 7.0]  y [-3.0, 3.6]
+Marcador (local-visitante): 0s 0-0 -> 16s 0-1 -> 23s 0-2 -> 57s 0-3 -> 67s 1-3 -> 97s 1-4 -> 113s 2-4
+Mensajes del entrenador vistos: ninguno
+

@@ -1,0 +1,92 @@
+{
+  "gk": {
+    "session": "bbcda716-860a-44ee-a04c-d051938fdf6d-team0-pos0",
+    "inicio_utc": "18:01:45",
+    "llamadas": 88,
+    "modelo_ok": 88,
+    "latencia_p50_s": 0.64,
+    "latencia_max_s": 0.84,
+    "comandos_del_modelo": {
+      "GK_DISTRIBUTE": 64,
+      "MOVE_TO": 21,
+      "INTERCEPT": 3
+    },
+    "con_balon": 4,
+    "pide_pase_tiro_saque_sin_balon": 60,
+    "persigue_balon_propio": 0,
+    "mensajes_entrenador": []
+  },
+  "def": {
+    "session": "bbcda716-860a-44ee-a04c-d051938fdf6d-team0-pos1",
+    "inicio_utc": "18:01:43",
+    "llamadas": 85,
+    "modelo_ok": 85,
+    "latencia_p50_s": 0.79,
+    "latencia_max_s": 1.79,
+    "comandos_del_modelo": {
+      "PRESS_BALL": 60,
+      "PASS": 16,
+      "MOVE_TO": 3,
+      "INTERCEPT": 3,
+      "SET_STANCE": 2,
+      "MARK": 1
+    },
+    "con_balon": 16,
+    "pide_pase_tiro_saque_sin_balon": 0,
+    "persigue_balon_propio": 28,
+    "mensajes_entrenador": []
+  },
+  "mid": {
+    "session": "bbcda716-860a-44ee-a04c-d051938fdf6d-team0-pos2",
+    "inicio_utc": "18:01:43",
+    "llamadas": 88,
+    "json_reparado": 55,
+    "modelo_ok": 88,
+    "latencia_p50_s": 1.09,
+    "latencia_max_s": 1.74,
+    "comandos_del_modelo": {
+      "MOVE_TO": 55,
+      "PASS": 17,
+      "PRESS_BALL": 12,
+      "INTERCEPT": 4
+    },
+    "con_balon": 9,
+    "pide_pase_tiro_saque_sin_balon": 8,
+    "persigue_balon_propio": 4,
+    "mensajes_entrenador": []
+  },
+  "fwd1": {
+    "session": "bbcda716-860a-44ee-a04c-d051938fdf6d-team0-pos3",
+    "inicio_utc": "18:01:45",
+    "llamadas": 85,
+    "modelo_ok": 85,
+    "latencia_p50_s": 0.64,
+    "latencia_max_s": 1.21,
+    "comandos_del_modelo": {
+      "MOVE_TO": 81,
+      "SHOOT": 4
+    },
+    "con_balon": 12,
+    "pide_pase_tiro_saque_sin_balon": 0,
+    "persigue_balon_propio": 0,
+    "mensajes_entrenador": []
+  },
+  "fwd2": {
+    "session": "bbcda716-860a-44ee-a04c-d051938fdf6d-team0-pos4",
+    "inicio_utc": "18:01:44",
+    "llamadas": 86,
+    "modelo_ok": 86,
+    "latencia_p50_s": 0.94,
+    "latencia_max_s": 1.93,
+    "comandos_del_modelo": {
+      "PRESS_BALL": 43,
+      "MOVE_TO": 22,
+      "SHOOT": 19,
+      "PASS": 2
+    },
+    "con_balon": 6,
+    "pide_pase_tiro_saque_sin_balon": 15,
+    "persigue_balon_propio": 27,
+    "mensajes_entrenador": []
+  }
+}
