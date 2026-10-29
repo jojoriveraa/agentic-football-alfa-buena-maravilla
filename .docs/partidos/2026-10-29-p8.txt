@@ -1,0 +1,19 @@
+Partido: sesion 6efe92ff-89a1-4366-8e20-56a5d8cd0a8e-team0-pos0  inicio 01:16:35 UTC
+
+pos   llam   ok filtro ajuste resp err   p50 conBalon sinBalon  propio  comandos del modelo
+GK      68   68     37      0    0   0  0.49        2       15       0  {'MOVE_TO': 36, 'GK_DISTRIBUTE': 17, 'INTERCEPT': 15}
+DEF     66   66      2      0    0   0  0.55        4        0       0  {'MARK': 22, 'PRESS_BALL': 22, 'MOVE_TO': 15, 'INTERCEPT': 3, 'PASS': 2, 'SET_STANCE': 1, 'SHOOT': 1}
+MID     66   66      6      0    0   0  0.59        4        0       0  {'MOVE_TO': 34, 'PRESS_BALL': 23, 'INTERCEPT': 4, 'PASS': 4, 'MARK': 1}
+FWD1    67   67      8      1    0   0  0.51        9        0       0  {'MOVE_TO': 45, 'PRESS_BALL': 16, 'PASS': 4, 'SHOOT': 2}
+FWD2    66   66      5      0    0   0  0.55        3        0       0  {'MOVE_TO': 32, 'PRESS_BALL': 31, 'SHOOT': 3}
+  filtro GK    {'goalkeeper stays home': 22, 'GK_DISTRIBUTE without the ball': 15}
+  filtro DEF   {'under pressure, carry the ball': 2}
+  filtro MID   {'backward run while attacking': 6}
+  filtro FWD1  {'under pressure, carry the ball': 4, 'backward run while attacking': 3, 'under pressure without an open pass, carry the ball': 1}
+  filtro FWD2  {'backward run while attacking': 3, 'under pressure, carry the ball': 2}
+
+Campo observado: x [-6.7, 6.8]  y [-3.0, 3.6]
+Marcador (local-visitante): 0s 0-0 -> 7s 1-0
+Mensajes del entrenador vistos: ['[{"senderTeamCode": "home", "message": "quiero ver mas tiro a porteria", "timestamp": 0}]']
+
+Guardado en /tmp/claude-1000/-home-ubuntu-kiro-agent/8f953eac-6ca8-4e92-9f7f-fcd2f91cd3f7/scratchpad/6efe92ff.json

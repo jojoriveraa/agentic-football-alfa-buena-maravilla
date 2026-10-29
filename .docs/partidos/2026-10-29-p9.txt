@@ -1,0 +1,19 @@
+Partido: sesion 40055767-930e-4ab5-8f82-7732a7940fa1-team0-pos0  inicio 01:20:35 UTC
+
+pos   llam   ok filtro ajuste resp err   p50 conBalon sinBalon  propio  comandos del modelo
+GK      96   96     35      0    0   0  0.46        3       17       0  {'MOVE_TO': 66, 'GK_DISTRIBUTE': 20, 'INTERCEPT': 10}
+DEF     90   90      2      0    0   0  0.55        5        0       1  {'MARK': 43, 'PRESS_BALL': 28, 'MOVE_TO': 13, 'PASS': 3, 'INTERCEPT': 2, 'SET_STANCE': 1}
+MID     90   90      5      0    0   0  0.57        2        0       0  {'PRESS_BALL': 46, 'MOVE_TO': 35, 'INTERCEPT': 4, 'MARK': 3, 'PASS': 2}
+FWD1    91   91      6      0    0   0  0.48        8        1       0  {'MOVE_TO': 58, 'PRESS_BALL': 26, 'PASS': 5, 'SHOOT': 1, 'SLIDE_TACKLE': 1}
+FWD2    94   94      4      0    0   0  0.54        4        0       0  {'PRESS_BALL': 53, 'MOVE_TO': 37, 'PASS': 3, 'SHOOT': 1}
+  filtro GK    {'goalkeeper stays home': 18, 'GK_DISTRIBUTE without the ball': 17}
+  filtro DEF   {'under pressure, carry the ball': 1, 'PRESS_BALL while our team has the ball': 1}
+  filtro MID   {'backward run while attacking': 4, 'under pressure without an open pass, carry the ball': 1}
+  filtro FWD1  {'under pressure, carry the ball': 3, 'backward run while attacking': 3}
+  filtro FWD2  {'backward run while attacking': 3, 'under pressure, carry the ball': 1}
+
+Campo observado: x [-6.8, 6.9]  y [-2.7, 3.6]
+Marcador (local-visitante): 0s 0-0 -> 21s 1-0 -> 51s 1-1 -> 85s 2-1 -> 98s 3-1 -> 111s 4-1
+Mensajes del entrenador vistos: ninguno
+
+Guardado en /tmp/claude-1000/-home-ubuntu-kiro-agent/8f953eac-6ca8-4e92-9f7f-fcd2f91cd3f7/scratchpad/40055767.json

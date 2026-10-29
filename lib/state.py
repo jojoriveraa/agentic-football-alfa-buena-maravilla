@@ -211,7 +211,9 @@ COACH_MESSAGES_SHOWN = 3
 """Most recent coach messages included in the prompt (newest last)."""
 
 _CHAT_TEXT_KEYS = ("message", "text", "content", "instruction", "msg")
-_CHAT_TEAM_KEYS = ("teamCode", "team", "teamId", "senderTeam", "fromTeam")
+# senderTeamCode is the live server's field (seen in P8:
+# {"senderTeamCode": "home", "message": "...", "timestamp": 0}); the rest are guesses.
+_CHAT_TEAM_KEYS = ("senderTeamCode", "teamCode", "team", "teamId", "senderTeam", "fromTeam")
 
 
 def _chat_text(entry) -> str:

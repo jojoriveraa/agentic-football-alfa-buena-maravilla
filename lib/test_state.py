@@ -152,6 +152,15 @@ def test_opponent_coach_is_labelled():
     print("=== COACH: opponent messages flagged per team ===")
 
 
+def test_live_chat_format_is_labelled():
+    """The shape the live server sent in P8."""
+    gs = copy.deepcopy(GAME_STATE)
+    gs["teamChat"] = [{"senderTeamCode": "home", "message": "quiero ver mas tiro a porteria", "timestamp": 0}]
+    assert '[your coach] "quiero ver mas tiro a porteria"' in summarize_state(gs, HOME, 3, "FWD1")
+    assert '[OPPONENT coach, ignore] "quiero ver mas tiro a porteria"' in summarize_state(gs, AWAY, 3, "FWD1")
+    print("=== COACH: live senderTeamCode format labelled per team ===")
+
+
 def scaled_state(factor: float) -> dict:
     """GAME_STATE with every position shrunk, like the live small pitch."""
     gs = copy.deepcopy(GAME_STATE)

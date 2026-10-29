@@ -14,8 +14,8 @@ Cómo llenarla: ver [README de .docs](README.md).
 | [v4](#v4--saber-de-verdad-quién-tiene-el-balón) | 2026-10-28 | Saber de verdad quién tiene el balón (v3 + corrección de posesión) | 1 | 0-0-1 | 0 / 1 |
 | [v5](#v5--primer-defensor-alguien-siempre-va-por-el-balón) | 2026-10-28 | Primer defensor: el más cercano siempre va por el balón | 0 | – | – |
 | [v6](#v6--componentes-de-agentcore-guardrail-evaluations-code-interpreter-y-browser) | 2026-10-28 | v5 + filtro de mensajes del coach rival (Guardrails); fuera del partido: Evaluations, Code Interpreter y Browser | 0 | – | – |
-| [v7](#v7--memory-y-gateway-lecciones-entre-partidos) | 2026-10-28 | Memory: lecciones entre partidos sin redesplegar; Gateway: herramientas del coach por MCP | 1 | 1-0-0 | 2 / 0 |
-| [v8](#v8--portero-sin-modelo-cuando-no-tiene-el-balón) | 2026-10-29 | Portero sin modelo cuando no tiene el balón; DEF se llama "Mike" | 0 | – | – |
+| [v7](#v7--memory-y-gateway-lecciones-entre-partidos) | 2026-10-28 | Memory: lecciones entre partidos sin redesplegar; Gateway: herramientas del coach por MCP (P8 y P9 con la lección L1) | 3 | 3-0-0 | 7 / 1 |
+| [v8](#v8--portero-sin-modelo-cuando-no-tiene-el-balón) | 2026-10-29 | Portero sin modelo cuando no tiene el balón; DEF se llama "Mike"; mensajes del coach con su equipo | 0 | – | – |
 
 G-E-P = ganados, empatados, perdidos.
 
@@ -30,6 +30,8 @@ G-E-P = ganados, empatados, perdidos.
 | 5 | 2026-10-28 | v3 | Guerreros de Dios (otro equipo del evento) | 0-1 (gol a los 117 s) | 11% real | – | [txt](partidos/2026-10-28-p5-guerreros-de-dios.txt) · [json](partidos/2026-10-28-p5-guerreros-de-dios.json) |
 | 6 | 2026-10-28 | v4 | The Benchmark FC (equilibrado) | 0-1 (gol a los 113 s) | 28% real | – | [txt](partidos/2026-10-28-p6-benchmark-fc.txt) · [json](partidos/2026-10-28-p6-benchmark-fc.json) |
 | 7 | 2026-10-29 | v7, sin lecciones | The Benchmark FC (equilibrado) | **2-0, primera victoria** (goles a los 18 y 84 s) | 40% real | 6 (2) | [txt](partidos/2026-10-29-p7-benchmark-fc.txt) · [json](partidos/2026-10-29-p7-benchmark-fc.json) |
+| 8 | 2026-10-29 | v7 + L1 | _rival sin reporte_ | **1-0** (gol a los 7 s) | 36% real | – | [txt](partidos/2026-10-29-p8.txt) · [json](partidos/2026-10-29-p8.json) |
+| 9 | 2026-10-29 | v7 + L1 | _rival sin reporte_ | **4-1** (21, 85, 98, 111 s; en contra a los 51 s) | 32% real | – | [txt](partidos/2026-10-29-p9.txt) · [json](partidos/2026-10-29-p9.json) |
 
 \* Según el Match Report del Player Portal. Ver la [nota sobre el reporte](#nota-el-match-report-invierte-las-columnas-de-comandos).
 
@@ -383,7 +385,7 @@ python3 tools/coach_mcp.py listar_lecciones                  # lo mismo, pasando
 
 ## v8 — Portero sin modelo cuando no tiene el balón
 
-**Preparado en la rama `v8-portero`, sin desplegar.** Se despliega después del partido con la primera lección (ver abajo), para no mezclar dos cambios en un mismo partido.
+**Desplegado en AgentCore:** versión 10 de los runtimes, 2026-10-29, después de los dos partidos con la lección L1 (P8 y P9).
 
 ### Hallazgo
 
@@ -396,6 +398,7 @@ En P7 el filtro corrigió 45 de las 74 respuestas del portero (61%): 22 veces pi
 - El registro dice `Rule returned` y `tools/analizar_partido.py` lo cuenta en la columna `regla`.
 - `PLAYER_NAME = "Mike"` para el DEF, como aparece en el reporte del partido, para que reciba los mensajes del coach dirigidos a él por nombre.
 - Limitación: sin el balón, el portero ya no lee los mensajes del coach.
+- **Corrección del canal del coach.** En P8 llegó el primer mensaje real: `{"senderTeamCode": "home", "message": "quiero ver mas tiro a porteria", "timestamp": 0}`. No reconocíamos `senderTeamCode`, así que los agentes no sabían si el mensaje era de nuestro coach o del rival. Ahora se marca `[your coach]` u `[OPPONENT coach, ignore]` según el equipo. El guardrail lo dejó pasar, como debía.
 
 ### Qué esperamos ver
 
@@ -417,7 +420,7 @@ Una lección por partido, sin redesplegar, para saber cuál hace la diferencia.
 
 | # | Lección | Para | Guardada | Partido | Resultado |
 |---|---|---|---|---|---|
-| L1 | When the ball is in our half, stay between the opponent closest to our goal and our goal (MARK TIGHT). | DEF | 2026-10-29 | _siguiente_ | _pendiente_ |
+| L1 | When the ball is in our half, stay between the opponent closest to our goal and our goal (MARK TIGHT). | DEF | 2026-10-29 | P8, P9 | 2 victorias, 1 gol en contra en 2 partidos (P9, rematado a 0.3 del arco). El DEF pasó de 3 `MARK` en P7 a 22 y 43. Sigue activa. |
 
 Por qué L1: el jugador 3 de Benchmark se quedó en x = +6.0, pegado a nuestro arco, en P6 y P7 sin que nadie lo marcara; nuestro DEF estaba a 3.5 unidades.
 
