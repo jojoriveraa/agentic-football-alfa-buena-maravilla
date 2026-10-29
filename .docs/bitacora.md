@@ -369,6 +369,13 @@ python3 tools/coach_mcp.py listar_lecciones                  # lo mismo, pasando
 - Forma con el balón: DEF -2.5, MID 0.0, FWD1 +1.0, FWD2 +0.5, ancho medio 0.9 de un campo de ±4. Seguimos jugando cerrados por el centro y con los delanteros poco adelantados.
 - El jugador P3 de Benchmark estuvo en x = +6.0 todo el partido (pegado a nuestro arco), igual que en P6, sin marca.
 - Nombres en el portal: el DEF se llama "Mike" (lo dice el reporte del gol).
+- **Tiros (P7).** Los 2 goles fueron tiros que eligió nuestra regla, no el modelo:
+  - en ambos el modelo quería conducir el balón (`MOVE_TO`), a 1.7 y 3.1 unidades del arco;
+  - el filtro lo cambió por `SHOOT` (al centro, potencia 1.0) porque estaban en rango y bajo presión.
+  - Los 6 tiros que eligió el modelo no entraron:
+    - dos desde 9.5 y 9.9, fuera de rango;
+    - dos a 1.3 y 1.6 con un rival a 0.2, que se los quedó un defensa;
+    - dos desde 4.3 y 5.4.
 - Evaluations (juez, `tools/calificaciones.py`): FWD1 0.95 y FWD2 0.95 de promedio (9 Good y 1 Questionable cada uno, 10 jugadas calificadas), y 1.00 en seguir su prompt. GK, DEF y MID no salieron en el muestreo del 20% por sesión; desde ahora es el 100%.
 
 ---
@@ -386,6 +393,7 @@ Ordenados por impacto esperado según los datos de v0. Regla: **un cambio por ve
 7. **Tiros de larga distancia** (oportunidad vista en los rivales). De 4 goles en contra reconstruidos con confianza, 2 vinieron desde lejos: a 4.8 unidades del arco (36% del largo) y a 6.5 (49%). Probar `shootRange` de unas 6.5 unidades para MID y delanteros.
 8. **Marcar al rival que se queda en nuestro arco.** En P4 un jugador de Benchmark estuvo todo el partido en x ≈ -6 (nuestro arco), sin marca. Los goles de cerca (P3 a 1.0, P2 a 0.2) son de ese tipo. Probar que el DEF lo marque con `MARK TIGHT` cuando el balón está en nuestra mitad.
 9. **Equipo demasiado atrás.** En P4, con el balón, la posición promedio fue DEF -4.6, MID -3.6, FWD1 -1.8 y FWD2 -2.2: todos en nuestra mitad. v3 y v4 deberían mejorarlo; medirlo con `tools/analizar_rivales.py`.
+11. **Tirar siempre en rango** (candidato para después de v8). Hoy el filtro solo convierte en tiro cuando hay presión. Si un jugador con el balón está en rango y sin presión, pasa el `MOVE_TO` del modelo. En P7 todas las ocasiones en rango tuvieron presión, así que no se perdió ninguna, pero con menos presión sí se perderían. Probar: en rango, siempre `SHOOT`.
 10. **Phase 3** (la fase de mejoras del taller): con v6 y v7 ya están los 6 componentes que faltaban. Los puntos 7, 8 y 9 ya se pueden probar como lecciones de Memory, una a la vez, sin redesplegar.
 
 ## Nota: el Match Report invierte las columnas de comandos
