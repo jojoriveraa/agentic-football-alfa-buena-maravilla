@@ -14,7 +14,7 @@ Cómo llenarla: ver [README de .docs](README.md).
 | [v4](#v4--saber-de-verdad-quién-tiene-el-balón) | 2026-10-28 | Saber de verdad quién tiene el balón (v3 + corrección de posesión) | 1 | 0-0-1 | 0 / 1 |
 | [v5](#v5--primer-defensor-alguien-siempre-va-por-el-balón) | 2026-10-28 | Primer defensor: el más cercano siempre va por el balón | 0 | – | – |
 | [v6](#v6--componentes-de-agentcore-guardrail-evaluations-code-interpreter-y-browser) | 2026-10-28 | v5 + filtro de mensajes del coach rival (Guardrails); fuera del partido: Evaluations, Code Interpreter y Browser | 0 | – | – |
-| [v7](#v7--memory-y-gateway-lecciones-entre-partidos) | 2026-10-28 | Memory: lecciones entre partidos sin redesplegar; Gateway: herramientas del coach por MCP | 0 | – | – |
+| [v7](#v7--memory-y-gateway-lecciones-entre-partidos) | 2026-10-28 | Memory: lecciones entre partidos sin redesplegar; Gateway: herramientas del coach por MCP | 1 | 1-0-0 | 2 / 0 |
 
 G-E-P = ganados, empatados, perdidos.
 
@@ -28,6 +28,7 @@ G-E-P = ganados, empatados, perdidos.
 | 4 | 2026-10-28 | v2 | The Benchmark FC (equilibrado) | 0-1 (gol a los 182 s) | – | – | [txt](partidos/2026-10-28-p4-benchmark-fc.txt) · [json](partidos/2026-10-28-p4-benchmark-fc.json) |
 | 5 | 2026-10-28 | v3 | Guerreros de Dios (otro equipo del evento) | 0-1 (gol a los 117 s) | 11% real | – | [txt](partidos/2026-10-28-p5-guerreros-de-dios.txt) · [json](partidos/2026-10-28-p5-guerreros-de-dios.json) |
 | 6 | 2026-10-28 | v4 | The Benchmark FC (equilibrado) | 0-1 (gol a los 113 s) | 28% real | – | [txt](partidos/2026-10-28-p6-benchmark-fc.txt) · [json](partidos/2026-10-28-p6-benchmark-fc.json) |
+| 7 | 2026-10-29 | v7, sin lecciones | The Benchmark FC (equilibrado) | **2-0, primera victoria** (goles a los 18 y 84 s) | 40% real | 6 (2) | [txt](partidos/2026-10-29-p7-benchmark-fc.txt) · [json](partidos/2026-10-29-p7-benchmark-fc.json) |
 
 \* Según el Match Report del Player Portal. Ver la [nota sobre el reporte](#nota-el-match-report-invierte-las-columnas-de-comandos).
 
@@ -352,7 +353,23 @@ python3 tools/coach_mcp.py listar_lecciones                  # lo mismo, pasando
 
 ### Resultados
 
-_Pendiente._
+**P7 vs The Benchmark FC: 2-0, primera victoria.** Sin lecciones guardadas, así que juega igual que v5 (primer defensor) más los componentes. Contra el mismo rival que P6 (0-1 con v4):
+
+| Métrica | P6 (v4) | P7 (v7) |
+|---|---|---|
+| Posesión real por muestras: nuestra / rival / suelto | 28% / 36% / 36% | 40% / 32% / 29% |
+| Muestras con posesión mal atribuida | 1 de 61 | 0 de 63 |
+| Goles | 0 (en contra: rival P4 desde 5.2) | FWD1 desde 1.5 del arco; MID desde 2.8 |
+| Filtro corrigió (promedio del equipo) | 13.6% | 17.0% (el GK solo: 61%) |
+| Latencia p50 (nuestros registros) | 0.61 s | 0.56 s |
+
+- El primer defensor funcionó: subió la posesión y bajó el balón suelto.
+- Memory funcionó: el portero registró los 2 goles; cada agente leyó las lecciones una vez (`loaded 0 lessons from memory`).
+- El portero sigue pidiendo `GK_DISTRIBUTE` sin balón (22 veces) y saliendo de su zona (23). El filtro lo corrige siempre, pero es el 61% de sus respuestas.
+- Forma con el balón: DEF -2.5, MID 0.0, FWD1 +1.0, FWD2 +0.5, ancho medio 0.9 de un campo de ±4. Seguimos jugando cerrados por el centro y con los delanteros poco adelantados.
+- El jugador P3 de Benchmark estuvo en x = +6.0 todo el partido (pegado a nuestro arco), igual que en P6, sin marca.
+- Nombres en el portal: el DEF se llama "Mike" (lo dice el reporte del gol).
+- Evaluations: el juez califica cuando la sesión lleva ~15 minutos inactiva; resultados pendientes.
 
 ---
 

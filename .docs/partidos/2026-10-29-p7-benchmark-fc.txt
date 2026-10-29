@@ -1,0 +1,19 @@
+Partido: sesion 995b1880-ac5d-4cb1-991f-9d1225951271-team0-pos0  inicio 00:04:55 UTC
+
+pos   llam   ok filtro ajuste resp err   p50 conBalon sinBalon  propio  comandos del modelo
+GK      74   74     45      0    0   0  0.49        0       22       0  {'MOVE_TO': 43, 'GK_DISTRIBUTE': 22, 'INTERCEPT': 9}
+DEF     72   72      3      0    0   0  0.56        3        0       2  {'PRESS_BALL': 40, 'MOVE_TO': 20, 'INTERCEPT': 6, 'MARK': 3, 'PASS': 2, 'SET_STANCE': 1}
+MID     72   72      4      0    0   0  0.64        7        0       0  {'MOVE_TO': 35, 'PRESS_BALL': 30, 'PASS': 3, 'INTERCEPT': 3, 'MARK': 1}
+FWD1    71   71      4      2    0   0  0.49        5        0       0  {'MOVE_TO': 55, 'PRESS_BALL': 11, 'SLIDE_TACKLE': 3, 'SHOOT': 2}
+FWD2    74   74      6      0    0   0  0.56        7        2       0  {'PRESS_BALL': 36, 'MOVE_TO': 30, 'SHOOT': 7, 'PASS': 1}
+  filtro GK    {'goalkeeper stays home': 23, 'GK_DISTRIBUTE without the ball': 22}
+  filtro DEF   {'PRESS_BALL while our team has the ball': 2, 'under pressure, carry the ball': 1}
+  filtro MID   {'under pressure, carry the ball': 4}
+  filtro FWD1  {'under pressure, carry the ball': 4}
+  filtro FWD2  {'under pressure, carry the ball': 4, 'SHOOT without the ball': 2}
+
+Campo observado: x [-6.4, 6.9]  y [-4.0, 2.8]
+Marcador (local-visitante): 0s 0-0 -> 18s 1-0 -> 84s 2-0
+Mensajes del entrenador vistos: ninguno
+
+Guardado en /tmp/claude-1000/-home-ubuntu-kiro-agent/8f953eac-6ca8-4e92-9f7f-fcd2f91cd3f7/scratchpad/p7.json
