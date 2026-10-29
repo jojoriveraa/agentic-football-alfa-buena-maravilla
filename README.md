@@ -34,6 +34,7 @@ tools/analisis_sandbox.py     # Tendencia de la temporada, calculada en el Code 
 tools/leer_taller.py          # Lee páginas del taller con el Browser de AgentCore
 tools/lecciones.py            # Guarda, lista y borra lecciones; lista los goles registrados
 tools/coach_mcp.py            # Llama a las herramientas del coach a través del Gateway (MCP)
+tools/calificaciones.py       # Calificaciones del juez de Evaluations por jugador (~15 min después del partido)
 tools/gateway_coach/          # Lambda de las herramientas del coach
 .docs/                        # Bitácora de versiones y reportes de partidos
 ```
