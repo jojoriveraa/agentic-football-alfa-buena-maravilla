@@ -156,7 +156,7 @@ def runtime_log_groups(ctl):
 
 
 def online_evaluations(ctl, create: bool, role_arn, evaluator_id, sampling: float):
-    """Judge a sample of live ticks, plus the built-in InstructionFollowing
+    """Judge live ticks of a sample of match sessions, plus the built-in InstructionFollowing
     check (does the model obey its system prompt). The service takes one
     service name per config, so each agent gets its own afwc_partidos_<pos>."""
     existing = {}
@@ -168,6 +168,11 @@ def online_evaluations(ctl, create: bool, role_arn, evaluator_id, sampling: floa
         name = f"{ONLINE_EVAL_NAME}_{agent.split('_')[1]}"
         if name in existing:
             configs[agent] = existing[name]
+            current = ctl.get_online_evaluation_config(onlineEvaluationConfigId=existing[name])["rule"]
+            if create and current["samplingConfig"]["samplingPercentage"] != sampling:
+                ctl.update_online_evaluation_config(
+                    onlineEvaluationConfigId=existing[name],
+                    rule={**current, "samplingConfig": {"samplingPercentage": sampling}})
             continue
         if not create or not role_arn or not evaluator_id:
             continue
@@ -359,7 +364,8 @@ def gateway(iam, ctl, account: str, lambda_arn: str):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--show", action="store_true", help="do not create anything")
-    ap.add_argument("--sampling", type=float, default=20.0, help="percent of ticks the judge scores")
+    ap.add_argument("--sampling", type=float, default=100.0,
+                    help="percent of match sessions the judge scores (it samples sessions, not ticks)")
     args = ap.parse_args()
     create = not args.show
 
