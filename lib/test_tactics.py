@@ -145,6 +145,24 @@ def test_hints_reach_the_prompt():
     print("=== HINTS: carrier options and support spot rendered ===")
 
 
+def test_keeper_without_ball_plays_the_rule():
+    """Ball far away: home spot. Loose ball near our goal: go get it. Our DEF
+    holding it near our goal: stay home."""
+    from tactics import keeper_off_ball
+    far = make_state({**KEEPERS_HOME, 1: (-3, 0)}, {**KEEPERS_AWAY, 3: (2, 1)}, holder=("away", 3))
+    cmd = keeper_off_ball(far, 0, 0)
+    assert cmd["commandType"] == "MOVE_TO" and cmd["parameters"]["sprint"] is False, cmd
+    loose = make_state({**KEEPERS_HOME, 1: (-3, 0)}, {**KEEPERS_AWAY, 3: (2, 1)})
+    loose["ball"]["position"] = {"x": -5.2, "y": 0.4, "z": 0}
+    cmd = keeper_off_ball(loose, 0, 0)
+    assert cmd["commandType"] == "MOVE_TO" and cmd["parameters"]["sprint"] is True, cmd
+    assert cmd["parameters"]["target_x"] == -5.2, cmd
+    ours = make_state({**KEEPERS_HOME, 1: (-5.2, 0.4)}, {**KEEPERS_AWAY, 3: (2, 1)}, holder=("home", 1))
+    cmd = keeper_off_ball(ours, 0, 0)
+    assert cmd["commandType"] == "MOVE_TO" and cmd["parameters"]["sprint"] is False, cmd
+    print("=== KEEPER: rule without the ball (home spot, loose ball, our ball) ===")
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     for fn in fns:

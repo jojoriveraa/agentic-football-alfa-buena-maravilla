@@ -80,6 +80,8 @@ def app_summary(records):
             started[req] = ts
         elif m.startswith("LLM returned"):
             n["modelo_ok"] += 1
+        elif m.startswith("Rule returned"):
+            n["regla_sin_modelo"] += 1
         elif m.startswith("LLM parse failed"):
             n["respaldo_por_parseo"] += 1
         elif "overriding model" in m:
@@ -93,7 +95,8 @@ def app_summary(records):
             n["errores"] += 1
         elif "teamChat changed" in m:
             chats.append((ts, m.split("teamChat changed: ", 1)[-1]))
-        if req in started and (m.startswith("LLM returned") or m.startswith("Fallback returned")):
+        if req in started and (m.startswith("LLM returned") or m.startswith("Fallback returned")
+                                  or m.startswith("Rule returned")):
             lat.append((ts - started.pop(req)) / 1000)
     return n, lat, chats, reasons
 
@@ -195,10 +198,11 @@ def main():
     first = next(iter(report.values()), None)
     if first:
         print(f"Partido: sesion {first['session']}  inicio {first['inicio_utc']} UTC\n")
-    print(f"{'pos':5} {'llam':>4} {'ok':>4} {'filtro':>6} {'ajuste':>6} {'resp':>4} {'err':>3} "
+    print(f"{'pos':5} {'llam':>4} {'ok':>4} {'regla':>5} {'filtro':>6} {'ajuste':>6} {'resp':>4} {'err':>3} "
           f"{'p50':>5} {'conBalon':>8} {'sinBalon':>8} {'propio':>7}  comandos del modelo")
     for pos, r in report.items():
-        print(f"{pos.upper():5} {r.get('llamadas',0):4} {r.get('modelo_ok',0):4} {r.get('filtro_corrigio',0):6} "
+        print(f"{pos.upper():5} {r.get('llamadas',0):4} {r.get('modelo_ok',0):4} {r.get('regla_sin_modelo',0):5} "
+              f"{r.get('filtro_corrigio',0):6} "
               f"{r.get('movimiento_ajustado',0):6} {r.get('respaldo_por_parseo',0):4} {r.get('errores',0):3} "
               f"{r['latencia_p50_s'] or 0:5.2f} {r['con_balon']:8} {r['pide_pase_tiro_saque_sin_balon']:8} "
               f"{r['persigue_balon_propio']:7}  {r['comandos_del_modelo']}")

@@ -16,7 +16,7 @@ app = BedrockAgentCoreApp()
 # --- Position Config ---
 MY_PLAYER_ID = 1
 POSITION_LABEL = "DEF"
-PLAYER_NAME = ""  # Same name as on the Player Portal's My Team page (for coaching)
+PLAYER_NAME = "Mike"  # Same name as on the Player Portal's My Team page (for coaching)
 
 # --- System Prompt ---
 

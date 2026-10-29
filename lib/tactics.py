@@ -352,6 +352,21 @@ def keeper_move(game_state: dict, team_id: int, my_player_id: int) -> dict:
     })
 
 
+def keeper_off_ball(game_state: dict, team_id: int, my_player_id: int) -> dict:
+    """The keeper's whole job without the ball, no model needed: come out for
+    a ball near our goal that we do not hold, otherwise hold the home spot.
+
+    In P7 the filter corrected 45 of the keeper's 74 answers (GK_DISTRIBUTE
+    without the ball, leaving its zone). Playing the rule directly also saves
+    the ~0.5 s model call on every tick without the ball.
+    """
+    ball = game_state.get("ball", {})
+    we_hold = get_possession_info(ball, game_state.get("players", []), team_id)[2]
+    if ball_near_our_goal(game_state, team_id) and not we_hold:
+        return chase_move(game_state, team_id, my_player_id)
+    return keeper_move(game_state, team_id, my_player_id)
+
+
 def keeper_leaves_zone(cmd: dict, game_state: dict, team_id: int) -> bool:
     """True when a keeper command would take it out of its zone for no reason."""
     if ball_near_our_goal(game_state, team_id):

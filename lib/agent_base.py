@@ -14,7 +14,8 @@ from state import _chat_text, summarize_state
 from fallback import FallbackConfig, build_last_resort
 from guards import fit_to_pitch, needs_fallback, tactical_override
 from state import holder_is_me
-from tactics import chase_move, first_defender, keeper_move, on_ball_decision, support_move, team_play_lines
+from tactics import (chase_move, first_defender, keeper_move, keeper_off_ball, on_ball_decision,
+                     support_move, team_play_lines)
 
 
 def create_agent(
@@ -150,6 +151,24 @@ def create_invoke_handler(
                     if len(kept) != len(team_chat):
                         game_state = {**game_state, "teamChat": kept}
 
+            # One writer per team: the keeper records each goal in Memory.
+            score = game_state.get("score")
+            if position_label == "GK" and score:
+                if last_chat.get("score") not in (None, score):
+                    match = re.sub(r"-pos\d+$", "", getattr(context, "session_id", None) or "sin-sesion")
+                    team_memory.record_goal(game_state, team_id, match, log)
+                last_chat["score"] = score
+
+            # The keeper only needs the model when it holds the ball.
+            if team_play and position_label == "GK" and not holder_is_me(
+                    game_state.get("ball", {}), game_state.get("players", []), team_id, effective_pid):
+                log.info(f"{position_label} agent invoked for team {team_id}, controlling player {effective_pid}")
+                commands = [keeper_off_ball(game_state, team_id, effective_pid)]
+                fit_to_pitch(commands, game_state)
+                log.info(f"Rule returned {len(commands)} commands: {[c.get('commandType') for c in commands]}")
+                yield json.dumps(commands)
+                return
+
             state_summary = summarize_state(
                 game_state, team_id, effective_pid, position_label, player_name
             )
@@ -162,13 +181,6 @@ def create_invoke_handler(
                 state_summary += "\n\nLESSONS FROM PREVIOUS MATCHES (your coach saved these):\n" + \
                     "\n".join(f"- {l}" for l in lessons)
 
-            # One writer per team: the keeper records each goal in Memory.
-            score = game_state.get("score")
-            if position_label == "GK" and score:
-                if last_chat.get("score") not in (None, score):
-                    match = re.sub(r"-pos\d+$", "", getattr(context, "session_id", None) or "sin-sesion")
-                    team_memory.record_goal(game_state, team_id, match, log)
-                last_chat["score"] = score
             log.info(f"{position_label} agent invoked for team {team_id}, controlling player {effective_pid}")
 
             response = agent(state_summary)

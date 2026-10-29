@@ -15,6 +15,7 @@ Cómo llenarla: ver [README de .docs](README.md).
 | [v5](#v5--primer-defensor-alguien-siempre-va-por-el-balón) | 2026-10-28 | Primer defensor: el más cercano siempre va por el balón | 0 | – | – |
 | [v6](#v6--componentes-de-agentcore-guardrail-evaluations-code-interpreter-y-browser) | 2026-10-28 | v5 + filtro de mensajes del coach rival (Guardrails); fuera del partido: Evaluations, Code Interpreter y Browser | 0 | – | – |
 | [v7](#v7--memory-y-gateway-lecciones-entre-partidos) | 2026-10-28 | Memory: lecciones entre partidos sin redesplegar; Gateway: herramientas del coach por MCP | 1 | 1-0-0 | 2 / 0 |
+| [v8](#v8--portero-sin-modelo-cuando-no-tiene-el-balón) | 2026-10-29 | Portero sin modelo cuando no tiene el balón; DEF se llama "Mike" | 0 | – | – |
 
 G-E-P = ganados, empatados, perdidos.
 
@@ -370,6 +371,48 @@ python3 tools/coach_mcp.py listar_lecciones                  # lo mismo, pasando
 - El jugador P3 de Benchmark estuvo en x = +6.0 todo el partido (pegado a nuestro arco), igual que en P6, sin marca.
 - Nombres en el portal: el DEF se llama "Mike" (lo dice el reporte del gol).
 - Evaluations: el juez califica cuando la sesión lleva ~15 minutos inactiva; resultados pendientes.
+
+---
+
+## v8 — Portero sin modelo cuando no tiene el balón
+
+**Preparado en la rama `v8-portero`, sin desplegar.** Se despliega después del partido con la primera lección (ver abajo), para no mezclar dos cambios en un mismo partido.
+
+### Hallazgo
+
+En P7 el filtro corrigió 45 de las 74 respuestas del portero (61%): 22 veces pidió `GK_DISTRIBUTE` sin tener el balón y 23 veces quiso salir de su zona. El reemplazo siempre era la misma regla, así que el modelo solo agregaba ~0.5 s por tick.
+
+### Cambio
+
+- `tactics.keeper_off_ball()`: sin el balón, el portero no llama al modelo. Si el balón está cerca de nuestro arco y no lo tenemos, va por él (`MOVE_TO` con sprint si está suelto, `PRESS_BALL` si lo tiene un rival); si no, se queda en su punto entre el balón y el centro del arco.
+- Con el balón sigue decidiendo el modelo (a quién despejar largo), con el filtro de siempre.
+- El registro dice `Rule returned` y `tools/analizar_partido.py` lo cuenta en la columna `regla`.
+- `PLAYER_NAME = "Mike"` para el DEF, como aparece en el reporte del partido, para que reciba los mensajes del coach dirigidos a él por nombre.
+- Limitación: sin el balón, el portero ya no lee los mensajes del coach.
+
+### Qué esperamos ver
+
+| Métrica | P7 | Esperado |
+|---|---|---|
+| Filtro corrigió al GK | 61% | Casi 0% (solo cuando tiene el balón) |
+| Latencia del GK sin balón | ~0.5 s | ~0 s |
+| Goles en contra cerca del arco | – | Igual o menos: el portero reacciona en el mismo tick |
+
+### Resultados
+
+_Pendiente._
+
+---
+
+## Experimento de lecciones (Memory)
+
+Una lección por partido, sin redesplegar, para saber cuál hace la diferencia.
+
+| # | Lección | Para | Guardada | Partido | Resultado |
+|---|---|---|---|---|---|
+| L1 | When the ball is in our half, stay between the opponent closest to our goal and our goal (MARK TIGHT). | DEF | 2026-10-29 | _siguiente_ | _pendiente_ |
+
+Por qué L1: el jugador 3 de Benchmark se quedó en x = +6.0, pegado a nuestro arco, en P6 y P7 sin que nadie lo marcara; nuestro DEF estaba a 3.5 unidades.
 
 ---
 
