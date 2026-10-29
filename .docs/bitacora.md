@@ -16,6 +16,7 @@ Cómo llenarla: ver [README de .docs](README.md).
 | [v6](#v6--componentes-de-agentcore-guardrail-evaluations-code-interpreter-y-browser) | 2026-10-28 | v5 + filtro de mensajes del coach rival (Guardrails); fuera del partido: Evaluations, Code Interpreter y Browser | 0 | – | – |
 | [v7](#v7--memory-y-gateway-lecciones-entre-partidos) | 2026-10-28 | Memory: lecciones entre partidos sin redesplegar; Gateway: herramientas del coach por MCP (P8 y P9 con la lección L1) | 3 | 3-0-0 | 7 / 1 |
 | [v8](#v8--portero-sin-modelo-cuando-no-tiene-el-balón) | 2026-10-29 | Portero sin modelo cuando no tiene el balón; DEF se llama "Mike"; mensajes del coach con su equipo | 0 | – | – |
+| [v9](#v9--manejo-de-estamina-y-marca-a-un-rival-real) | 2026-10-29 | Jugador cansado no corre a sprint; la marca siempre apunta a un rival de campo | 0 | – | – |
 
 G-E-P = ganados, empatados, perdidos.
 
@@ -407,6 +408,51 @@ En P7 el filtro corrigió 45 de las 74 respuestas del portero (61%): 22 veces pi
 | Filtro corrigió al GK | 61% | Casi 0% (solo cuando tiene el balón) |
 | Latencia del GK sin balón | ~0.5 s | ~0 s |
 | Goles en contra cerca del arco | – | Igual o menos: el portero reacciona en el mismo tick |
+
+### Resultados
+
+_Pendiente._
+
+---
+
+## v9 — Manejo de estamina y marca a un rival real
+
+**Preparado en la rama `v9-estamina`, sin desplegar.** Se despliega después de medir v8 en un partido.
+
+### Hallazgo
+
+Calificaciones del juez de Evaluations (promedio de 10 jugadas por jugador; 1 Good, 0.5 Questionable, 0 Bad):
+
+| Partido | GK | DEF | MID | FWD1 | FWD2 |
+|---|---|---|---|---|---|
+| P8 | 0.85 | 0.90 | 0.90 | 0.85 | **0.65** |
+| P9 | 0.90 | 0.85 | 0.85 | 1.00 | **0.65** |
+
+FWD2 sacó 2 Bad en cada partido. El juez lo penalizó por presionar sin ser el más cercano al balón y por presionar "con estamina cero". Al medir la estamina en los registros:
+
+| Jugador | P8: tiempo con estamina < 0.2 | P8: primera vez < 0.2 | P9: tiempo con estamina < 0.2 |
+|---|---|---|---|
+| FWD2 | 50% | segundo 14 | 34% |
+| FWD1 | 43% | segundo 6 | 16% |
+| MID | 28% | segundo 14 | 12% |
+| DEF | 0% | – | 0% |
+
+La guía del taller dice que `sprint: true` "gasta estamina" y que `PRESS_BALL` arriba de 0.5 hace correr a sprint. Nuestras reglas corren a sprint en 4 lugares (apoyo, conducción, ir por un balón suelto, presión a 0.8), y el modelo pide presiones fuertes.
+
+El juez también marcó una `MARK` del DEF a un "jugador 5" que no existe. En P8 y P9 el DEF marcó 6 veces al portero rival (id 0).
+
+### Cambio
+
+- `guards.pace()`: con estamina < 0.25, `MOVE_TO` va sin sprint y `PRESS_BALL` baja a 0.45 (todavía intenta quitar el balón, pero sin sprint). Excepción: con el balón cerca de nuestro arco se permite todo. Se aplica a la decisión final, sea del modelo o de nuestras reglas. En el registro aparece `effort adjusted`.
+- `guards.fix_mark_target()`: una `MARK` al portero rival o a un jugador que no existe pasa a marcar al rival más cercano a nuestro arco, que es lo que pide L1.
+
+### Qué esperamos ver
+
+| Métrica | P8 / P9 | Esperado |
+|---|---|---|
+| Tiempo de FWD2 con estamina < 0.2 | 50% / 34% | Menos de la mitad |
+| Calificación del juez a FWD2 | 0.65 / 0.65 | Arriba de 0.8 |
+| Marcas al portero rival o a jugadores inexistentes | 7 | 0 |
 
 ### Resultados
 

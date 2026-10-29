@@ -7,8 +7,19 @@ match standing still. These checks catch that class of mistake and let the
 rule-based fallback decide instead.
 """
 
-from state import get_possession_info, holder_is_me, pitch_bounds, pitch_scale
+import math
+
+from state import (
+    _is_my_team,
+    _player_idx,
+    get_goal_positions,
+    get_possession_info,
+    holder_is_me,
+    pitch_bounds,
+    pitch_scale,
+)
 from tactics import (
+    ball_near_our_goal,
     first_defender,
     goes_for_ball,
     in_shooting_range,
@@ -118,4 +129,62 @@ def fit_to_pitch(commands: list[dict], game_state: dict) -> list[str]:
         if (nx, ny) != (x, y):
             params["target_x"], params["target_y"] = round(nx, 2), round(ny, 2)
             notes.append(f"MOVE_TO ({x}, {y}) -> ({params['target_x']}, {params['target_y']})")
+    return notes
+
+
+TIRED = 0.25
+"""Stamina (0-1) below which a player stops sprinting. In P8 FWD2 spent half
+the match under 0.2, from second 14 on, mostly pressing at full speed."""
+CALM_PRESS = 0.45
+"""PRESS_BALL intensity that still tackles (above 0.3) without sprinting
+(above 0.5), per the workshop's command reference."""
+
+
+def pace(commands: list[dict], game_state: dict, team_id: int, my_player_id: int) -> list[str]:
+    """Stop a tired player sprinting, in place. Returns notes on changes.
+
+    Sprinting drains stamina and our players ran out early. A tired player
+    walks to MOVE_TO targets and presses at CALM_PRESS, except when the ball
+    is near our goal, where every step counts.
+    """
+    me = next((p for p in game_state.get("players", [])
+               if _is_my_team(p, team_id) and _player_idx(p) == my_player_id), None)
+    stamina = (me or {}).get("stamina", 1.0)
+    if not isinstance(stamina, (int, float)) or stamina >= TIRED or ball_near_our_goal(game_state, team_id):
+        return []
+    notes = []
+    for cmd in commands:
+        params = cmd.get("parameters") or {}
+        if cmd.get("commandType") == "MOVE_TO" and params.get("sprint"):
+            params["sprint"] = False
+            notes.append(f"stamina {stamina:.2f}: MOVE_TO without sprint")
+        elif cmd.get("commandType") == "PRESS_BALL" and (params.get("intensity") or 0) > CALM_PRESS:
+            notes.append(f"stamina {stamina:.2f}: PRESS_BALL {params.get('intensity')} -> {CALM_PRESS}")
+            params["intensity"] = CALM_PRESS
+    return notes
+
+
+def fix_mark_target(commands: list[dict], game_state: dict, team_id: int) -> list[str]:
+    """Point MARK at an opponent outfield player, in place.
+
+    In P8 and P9 the defender marked the opposing keeper (id 0) six times and
+    a player 5 that does not exist once. Those become a mark on the opponent
+    closest to our goal, which is what lesson L1 asks for.
+    """
+    opponents = [p for p in game_state.get("players", [])
+                 if not _is_my_team(p, team_id) and _player_idx(p) not in (None, 0)]
+    if not opponents:
+        return []
+    valid = {_player_idx(p) for p in opponents}
+    my_goal_x, _ = get_goal_positions(team_id, pitch_scale(game_state))
+    notes = []
+    for cmd in commands:
+        params = cmd.get("parameters") or {}
+        target = params.get("target_player_id")
+        if cmd.get("commandType") != "MARK" or target in valid:
+            continue
+        closest = min(opponents, key=lambda p: math.dist(
+            (p.get("position", {}).get("x", 0), p.get("position", {}).get("y", 0)), (my_goal_x, 0)))
+        params["target_player_id"] = _player_idx(closest)
+        notes.append(f"MARK {target} -> {params['target_player_id']} (closest opponent to our goal)")
     return notes

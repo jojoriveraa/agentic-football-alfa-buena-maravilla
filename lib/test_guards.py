@@ -6,7 +6,7 @@ Run directly:  python test_guards.py
 import copy
 
 from fallback import FWD1_CONFIG, GK_CONFIG, build_fallback
-from guards import fit_to_pitch, needs_fallback
+from guards import fit_to_pitch, fix_mark_target, needs_fallback, pace
 from test_helpers import GAME_STATE
 from test_state import scaled_state
 
@@ -88,6 +88,42 @@ def test_fallback_scales_with_pitch():
     fwd = build_fallback(FWD1_CONFIG)(gs2, HOME, 3)[0]
     assert fwd["commandType"] == "SHOOT", fwd
     print("=== FALLBACK: positions and shooting range follow the pitch ===")
+
+
+def _tired(stamina, ball_x):
+    """Home FWD 3 with the given stamina; ball at ball_x on the small pitch."""
+    gs = scaled_state(0.12)
+    for p in gs["players"]:
+        if p["agentId"] == "agentId_3" and p["teamCode"] == "home":
+            p["stamina"] = stamina
+    gs["ball"]["position"] = {"x": ball_x, "y": 0.0, "z": 0}
+    gs["ball"]["isFree"] = True
+    return gs
+
+
+def test_tired_player_stops_sprinting():
+    gs = _tired(0.1, 2.0)
+    cmds = [_move(1.0, 1.0), {"commandType": "PRESS_BALL", "playerId": 3, "parameters": {"intensity": 0.8}}]
+    notes = pace(cmds, gs, HOME, 3)
+    assert cmds[0]["parameters"]["sprint"] is False and cmds[1]["parameters"]["intensity"] == 0.45, cmds
+    assert len(notes) == 2
+    fresh = [_move(1.0, 1.0)]
+    assert pace(fresh, _tired(0.9, 2.0), HOME, 3) == [] and fresh[0]["parameters"]["sprint"] is True
+    near_goal = [_move(-5.0, 0.0)]
+    assert pace(near_goal, _tired(0.1, -6.0), HOME, 3) == [] and near_goal[0]["parameters"]["sprint"] is True
+    print("=== PACE: tired players walk, except with the ball near our goal ===")
+
+
+def test_mark_points_at_a_real_outfield_opponent():
+    gs = scaled_state(0.12)
+    for target in (0, 5):
+        cmds = [{"commandType": "MARK", "playerId": 1, "parameters": {"target_player_id": target, "tightness": "TIGHT"}}]
+        notes = fix_mark_target(cmds, gs, HOME)
+        new = cmds[0]["parameters"]["target_player_id"]
+        assert new not in (0, 5) and notes, (target, cmds)
+    ok = [{"commandType": "MARK", "playerId": 1, "parameters": {"target_player_id": 3, "tightness": "TIGHT"}}]
+    assert fix_mark_target(ok, gs, HOME) == [] and ok[0]["parameters"]["target_player_id"] == 3
+    print("=== MARK: keeper or missing targets become the opponent closest to our goal ===")
 
 
 if __name__ == "__main__":

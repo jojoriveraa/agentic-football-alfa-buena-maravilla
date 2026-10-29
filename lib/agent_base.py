@@ -12,7 +12,7 @@ import coach_guard
 import team_memory
 from state import _chat_text, summarize_state
 from fallback import FallbackConfig, build_last_resort
-from guards import fit_to_pitch, needs_fallback, tactical_override
+from guards import fit_to_pitch, fix_mark_target, needs_fallback, pace, tactical_override
 from state import holder_is_me
 from tactics import (chase_move, first_defender, keeper_move, keeper_off_ball, on_ball_decision,
                      support_move, team_play_lines)
@@ -213,6 +213,9 @@ def create_invoke_handler(
 
             for note in fit_to_pitch(commands, game_state):
                 log.info(f"{position_label} target fitted to pitch: {note}")
+            for note in fix_mark_target(commands, game_state, team_id) + \
+                    pace(commands, game_state, team_id, effective_pid):
+                log.info(f"{position_label} effort adjusted: {note}")
             yield json.dumps(commands)
 
         except Exception as e:
